@@ -1,0 +1,47 @@
+# macOS
+.DS_Store
+.AppleDouble
+._*
+
+# Swift / Xcode generated output
+.build/
+.swiftpm/
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xcresult/
+*.dSYM/
+
+# Distribution output
+dist/
+artifacts/
+*.app/
+*.dmg
+*.pkg
+
+# Local editor settings
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Credentials and signing material
+.env
+.env.*
+!.env.example
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile
+*.keychain-db
+
+# Personal projects, sessions, and measurements
+.local/
+*.mexplore
+*.mexplore.lock
+*.log
+*.trace/
+# Reviewed synthetic fixtures may be committed in these directories.
+!Tests/Fixtures/**/*.mexplore
+!examples/**/*.mexplore
