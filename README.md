@@ -9,7 +9,14 @@ Windows Explorerの操作感を基本にした、軽量なmacOSネイティブ�
 
 ## 現在の状態
 
-**要件・開発工程の整理とGit初期化（P0）まで完了。アプリ本体は未実装です。**
+**P1のネイティブアプリ試作を実装しました。現在は閲覧用の開発版です。**
+
+複数のMDI親ウィンドウ、子画面の移動・サイズ変更・整列・最大化・最小化、
+別プロセス起動を実装しています。フォルダ一覧、パス入力、履歴、列ソート、名前フィルター、
+隠し項目切替も使える構成です。プロジェクト保存とファイルの書き換え操作は今後の工程です。
+実機での画面操作・VoiceOver・最小対応OSの検証は残っています。
+
+検証結果と制約は[P1の実装記録](docs/p1-verification.md)を参照してください。
 
 2026-09-25に初期仕様を整理しました。プロジェクト名は仮称です。
 管理者・GitHubユーザー名は **[moooyooo](https://github.com/moooyooo)** です。
@@ -42,7 +49,7 @@ flowchart TB
 
 ## 設計の軸
 
-- Swift＋AppKitを採用予定。標準フレームワークを中心に構成する。
+- Swift＋AppKitを採用。実行時の外部依存はゼロ。
 - Explorer風のメニュー、フォルダツリー、詳細一覧、アドレスバーを備える。
 - Windows系ショートカットを基本に、Command系操作も併用できるようにする。
 - MDI子画面は移動・サイズ変更・最大化・最小化・整列に対応する。
@@ -61,12 +68,38 @@ flowchart TB
 
 ## 開発環境
 
-Swift 6系とmacOS SDKを使用する計画です。最初の実装工程でSwift Packageと
-`.app`生成手順を追加し、実際に検証したビルド・起動コマンドをここに記載します。
+Swift 6系とmacOS SDKが必要です。Command Line Toolsのみでもビルドできます。
+
+```sh
+scripts/test.sh
+scripts/build-app.sh release
+open "build/Moooyooo Mac Explore.app"
+```
+
+`build/`にローカル用のad-hoc署名を付けた`.app`を生成します。
+別プロセスでの起動は、アプリの「ファイル → 別プロセスで起動」から行えます。
+ターミナルでは次のように起動できます。
+
+```sh
+open -n "build/Moooyooo Mac Explore.app" --args --folder "$PWD"
+```
+
+`--folder`を複数回指定すると複数の子画面を開きます。`--demo`は親2つ・各子3つを開きます。
+アプリ生成後、`scripts/test.sh --integration`で実際の別プロセス起動・終了を検証できます。
+テスト用アプリは自動的に終了します。
+
+主なキー操作はCmd/Ctrl+N（子追加）、Cmd/Ctrl+Option+N（親追加）、
+Ctrl+Tab（子切替）、Cmd/Ctrl+L（パス入力）、F5（更新）です。
+子の右下をドラッグするとサイズを変更できます。キーボードではウィンドウメニューの
+「子画面を移動」「サイズを変更」を選び、矢印・Enter・Escを使います。
+
+`scripts/test.sh`は、一部のCommand Line Toolsで必要なSwift Testingの検索パスを補います。
+Xcodeを選択している環境では通常のSwiftPM設定を利用します。
 
 初期確認環境はmacOS 26.5 / Apple Silicon / Swift 6.3.2 / Command Line Toolsです。
 現在選択されている開発者ディレクトリはCommand Line Toolsです。
-Xcodeを必要とするUI自動テスト・配布検証の環境は、該当工程で整えます。
+GitHub Actions用にmacOSでのテスト・Releaseビルドを定義しています。
+GitHubへまだpushしていないため、CI上での結果は未確認です。
 
 ## ライセンス・公開
 

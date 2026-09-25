@@ -1,0 +1,28 @@
+name: macOS build and test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Record toolchain
+        run: |
+          sw_vers
+          swift --version
+          xcode-select -p
+      - name: Test
+        run: scripts/test.sh
+      - name: Build app
+        run: scripts/build-app.sh release
+      - name: Check whitespace
+        run: git diff --check
