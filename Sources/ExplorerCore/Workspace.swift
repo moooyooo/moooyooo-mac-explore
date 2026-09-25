@@ -10,11 +10,11 @@ public struct ExplorerPane: Identifiable, Sendable {
     public var normalFrame: PaneFrame
     public var presentation: PanePresentation
 
-    public init(directory: URL, frame: PaneFrame) {
-        self.id = UUID()
+    public init(id: UUID = UUID(), directory: URL, frame: PaneFrame, presentation: PanePresentation = .normal) {
+        self.id = id
         self.directory = directory
         self.normalFrame = frame
-        self.presentation = .normal
+        self.presentation = presentation
     }
 }
 
@@ -24,6 +24,13 @@ public struct Workspace: Sendable {
     public private(set) var activePaneID: UUID?
 
     public init() {}
+
+    public init(project: ProjectDocument) throws {
+        try project.validate()
+        panes = project.panes.map { ExplorerPane(id: $0.id, directory: $0.folder.url, frame: $0.normalFrame, presentation: $0.presentation) }
+        zOrder = project.zOrder
+        activePaneID = project.activePaneID
+    }
 
     public var activePane: ExplorerPane? { panes.first { $0.id == activePaneID } }
 

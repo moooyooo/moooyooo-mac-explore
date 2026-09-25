@@ -83,6 +83,10 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     private var chrome: [UUID: PaneChrome] = [:]
     var onClose: (() -> Void)?
     var onDirectoryLoaded: (() -> Void)?
+    var project: WorkspaceProjectController?
+    private var suppressChanges = false
+    private var closeApproved = false
+    private var lastWindowFrame: NSRect?
     private let root = LayoutView()
     private let canvas = LayoutView()
     private let shelf = NSScrollView()
@@ -98,7 +102,8 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     var activeBrowser: ExplorerBrowserController? { state.activePaneID.flatMap { browsers[$0] } }
     var canvasSize: CanvasSize { CanvasSize(width: canvas.bounds.width, height: canvas.bounds.height) }
 
-    init(number: Int, directories: [URL], newWindow: @escaping () -> Void, newInstance: @escaping () -> Void) {
+    init(number: Int, directories: [URL], newWindow: @escaping () -> Void, newInstance: @escaping () -> Void,
+         openProject: @escaping () -> Void = {}) {
         self.number = number
         let window = WorkspaceWindow(
             contentRect: NSRect(x: 120 + (number % 5) * 25, y: 100 + (number % 5) * 25, width: 1160, height: 770),
@@ -123,6 +128,11 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         canvas.addSubview(emptyMessage)
         root.addSubview(canvas)
         toolbar = [
+            ActionButton("プロジェクトを開く", symbol: "folder", action: openProject),
+            ActionButton("プロジェクトを保存", symbol: "square.and.arrow.down") { [weak self] in
+                let project = self?.project
+                Task { await project?.save() }
+            },
             ActionButton("Explorer追加", symbol: "plus") { [weak self] in self?.addPane() },
             ActionButton("ウィンドウ追加", symbol: "macwindow.badge.plus", action: newWindow),
             ActionButton("別プロセス", symbol: "square.on.square", action: newInstance),
@@ -130,6 +140,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
             ActionButton("上下に整列", symbol: "rectangle.split.1x2") { [weak self] in self?.arrange(.rows) },
             ActionButton("重ねる", symbol: "square.3.layers.3d") { [weak self] in self?.arrange(.cascade) },
         ]
+        for button in toolbar.prefix(2) { button.imagePosition = .imageOnly; button.toolTip = button.title }
         for button in toolbar { root.addSubview(button) }
         shelf.documentView = shelfContent
         shelf.hasHorizontalScroller = true
@@ -147,17 +158,28 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     required init?(coder: NSCoder) { fatalError() }
 
     func addPane(directory: URL? = nil) {
+        guard state.panes.count < ProjectDocument.maximumPanes else { NSSound.beep(); return }
         finishGeometry()
         let url = directory ?? activeBrowser?.directory ?? FileManager.default.homeDirectoryForCurrentUser
         let id = state.add(directory: url, canvas: canvasSize)
-        let browser = ExplorerBrowserController(paneID: id, directory: url)
+        installPane(state.panes.first { $0.id == id }!, settings: .init())
+        render(); activeBrowser?.focusFiles(); changed()
+    }
+
+    private func installPane(_ model: ExplorerPane, settings: BrowserSettings) {
+        let id = model.id
+        let browser = ExplorerBrowserController(paneID: id, directory: model.directory, settings: settings)
         browsers[id] = browser
         browser.onLoadFinished = { [weak self] in self?.onDirectoryLoaded?() }
         browser.onLocationChange = { [weak self] url in
             guard let self else { return }
+            let old = self.state.panes.first { $0.id == id }?.directory
             self.state.setDirectory(url, for: id)
             self.render()
+            if old != url { self.changed() }
         }
+        browser.onSettingsChange = { [weak self] in self?.changed() }
+        browser.onOpenInNewPane = { [weak self] url in self?.addPane(directory: url) }
         let pane = PaneChrome(id: id, browser: browser,
                               minimize: { [weak self] in self?.minimize(id) },
                               maximize: { [weak self] in self?.maximize(id) },
@@ -171,15 +193,15 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         pane.grip.onDrag = { [weak self] dx, dy in self?.drag(id, dx: dx, dy: dy, resizing: true) }
         pane.grip.onKeyboardAction = { [weak self] in self?.activate(id); self?.beginGeometry(resizing: true) }
         canvas.addSubview(pane)
-        render()
-        browser.focusFiles()
     }
 
     func activate(_ id: UUID, focus: Bool = true) {
+        let previous = state.activePaneID
         if state.activePaneID != id { finishGeometry() }
         state.activate(id)
         render()
         if focus { activeBrowser?.focusFiles() }
+        if previous != id { changed() }
     }
 
     func activatePane(atWindowPoint point: NSPoint) {
@@ -203,6 +225,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         state.close(id)
         render()
         activeBrowser?.focusFiles()
+        changed()
     }
 
     func minimizeActivePane() { if let id = state.activePaneID { minimize(id) } }
@@ -213,6 +236,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         state.minimize(id)
         render()
         activeBrowser?.focusFiles()
+        changed()
     }
 
     private func maximize(_ id: UUID) {
@@ -220,19 +244,23 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         state.toggleMaximize(id)
         render()
         activeBrowser?.focusFiles()
+        changed()
     }
 
     func cycle(backward: Bool = false) {
         finishGeometry()
+        let previous = state.activePaneID
         state.cycle(backward: backward)
         render()
         activeBrowser?.focusFiles()
+        if previous != state.activePaneID { changed() }
     }
 
     func arrange(_ arrangement: Arrangement) {
         finishGeometry()
         state.arrange(arrangement, canvas: canvasSize)
         render()
+        changed()
     }
 
     func chooseFolder() {
@@ -262,11 +290,12 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         else { frame.x += dx; frame.y += dy }
         state.setFrame(frame, for: id, canvas: canvasSize)
         layoutPanes()
+        changed()
     }
 
     func beginGeometry(resizing: Bool) {
         guard let pane = state.activePane else { return }
-        if pane.presentation == .maximized { state.toggleMaximize(pane.id) }
+        if pane.presentation == .maximized { state.toggleMaximize(pane.id); changed() }
         geometryMode = (pane.id, resizing, pane.normalFrame.resolved(in: canvasSize))
         window?.makeFirstResponder(nil)
         hint.stringValue = "\(resizing ? "サイズ変更" : "移動"): 矢印キー · Shiftで大きく · Enterで確定 · Escで取消"
@@ -279,6 +308,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
             state.setFrame(mode.original, for: mode.id, canvas: canvasSize)
             finishGeometry()
             render()
+            changed()
             return true
         }
         if event.keyCode == 36 { finishGeometry(); activeBrowser?.focusFiles(); return true }
@@ -290,6 +320,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         else { frame.x += dx; frame.y += dy }
         state.setFrame(frame, for: mode.id, canvas: canvasSize)
         layoutPanes()
+        changed()
         return true
     }
 
@@ -300,7 +331,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         let height = root.bounds.height
         var x: CGFloat = 8
         for button in toolbar {
-            let buttonWidth = max(72, button.intrinsicContentSize.width + 4)
+            let buttonWidth = button.imagePosition == .imageOnly ? 32 : max(72, button.intrinsicContentSize.width + 4)
             button.frame = NSRect(x: x, y: 8, width: buttonWidth, height: 28)
             x += buttonWidth + 6
         }
@@ -348,6 +379,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        project?.release()
         browsers.values.forEach { $0.stop() }
         browsers.removeAll()
         chrome.removeAll()
@@ -355,4 +387,60 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func stopLoading() { browsers.values.forEach { $0.stop() } }
+
+    func reloadBrowsers() { browsers.values.forEach { $0.reload() } }
+
+    private func changed() { if !suppressChanges { project?.changed() } }
+
+    func snapshot(name: String) -> ProjectDocument {
+        var document = ProjectDocument(name: name, workspace: state)
+        for i in document.panes.indices {
+            document.panes[i].settings = browsers[document.panes[i].id]?.savedSettings ?? .init()
+        }
+        if let f = window?.frame { document.windowFrame = PaneFrame(x: f.minX, y: f.minY, width: f.width, height: f.height) }
+        return document
+    }
+
+    func restore(_ document: ProjectDocument) throws {
+        let restored = try Workspace(project: document)
+        suppressChanges = true
+        defer { suppressChanges = false }
+        finishGeometry()
+        stopLoading()
+        chrome.values.forEach { $0.removeFromSuperview() }
+        browsers.removeAll(); chrome.removeAll()
+        state = restored
+        if let saved = document.windowFrame, let screen = NSScreen.screens.max(by: {
+            $0.visibleFrame.intersection(NSRect(x: saved.x, y: saved.y, width: saved.width, height: saved.height)).width <
+            $1.visibleFrame.intersection(NSRect(x: saved.x, y: saved.y, width: saved.width, height: saved.height)).width
+        }) {
+            let available = screen.visibleFrame
+            let width = min(available.width, max(760, saved.width)), height = min(available.height, max(480, saved.height))
+            let x = min(max(available.minX, saved.x), available.maxX - width)
+            let y = min(max(available.minY, saved.y), available.maxY - height)
+            window?.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
+        }
+        for (pane, saved) in zip(state.panes, document.panes) { installPane(pane, settings: saved.settings) }
+        render(); activeBrowser?.focusFiles()
+        lastWindowFrame = window?.frame
+    }
+
+    func windowDidMove(_ notification: Notification) { frameChanged() }
+    func windowDidResize(_ notification: Notification) { frameChanged() }
+    private func frameChanged() {
+        let previous = lastWindowFrame
+        lastWindowFrame = window?.frame
+        if let previous, previous != lastWindowFrame { changed() }
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        if closeApproved { return true }
+        guard let project else { return true }
+        Task { [weak self] in
+            guard await project.confirmDiscardingChanges(), let self else { return }
+            self.closeApproved = true
+            self.window?.performClose(nil)
+        }
+        return false
+    }
 }

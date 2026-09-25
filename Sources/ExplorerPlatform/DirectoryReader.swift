@@ -1,4 +1,5 @@
 import Foundation
+import ExplorerCore
 
 public struct FileEntry: Identifiable, Sendable {
     public let url: URL
@@ -36,9 +37,11 @@ public enum DirectoryReader {
                 try Task.checkCancellation()
                 // An individual item can disappear during enumeration; keep the rest usable.
                 guard let values = try? url.resourceValues(forKeys: keys) else { continue }
+                let target = values.isSymbolicLink == true ? try? url.resolvingSymlinksInPath().resourceValues(forKeys: [.isDirectoryKey, .isPackageKey]) : nil
                 result.append(FileEntry(
                     url: url, name: url.lastPathComponent,
-                    isDirectory: values.isDirectory == true, isPackage: values.isPackage == true,
+                    isDirectory: (target?.isDirectory ?? values.isDirectory) == true,
+                    isPackage: (target?.isPackage ?? values.isPackage) == true,
                     isSymbolicLink: values.isSymbolicLink == true,
                     size: values.fileSize.map(Int64.init), modified: values.contentModificationDate
                 ))
@@ -54,5 +57,26 @@ public enum DirectoryReader {
         } onCancel: {
             worker.cancel()
         }
+    }
+
+    public static func project(_ entries: [FileEntry], settings: BrowserSettings) async throws -> [FileEntry] {
+        let worker = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            let result = entries.filter { settings.filter.isEmpty || $0.name.localizedStandardContains(settings.filter) }.sorted { lhs, rhs in
+                if lhs.isBrowsable != rhs.isBrowsable { return lhs.isBrowsable }
+                let comparison: ComparisonResult
+                switch settings.sortColumn {
+                case .size: comparison = (lhs.size ?? 0) == (rhs.size ?? 0) ? .orderedSame : ((lhs.size ?? 0) < (rhs.size ?? 0) ? .orderedAscending : .orderedDescending)
+                case .modified: comparison = (lhs.modified ?? .distantPast).compare(rhs.modified ?? .distantPast)
+                case .kind: comparison = lhs.kind.localizedStandardCompare(rhs.kind)
+                case .name: comparison = lhs.name.localizedStandardCompare(rhs.name)
+                }
+                if comparison == .orderedSame { return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending }
+                return settings.ascending ? comparison == .orderedAscending : comparison == .orderedDescending
+            }
+            try Task.checkCancellation()
+            return result
+        }
+        return try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
     }
 }

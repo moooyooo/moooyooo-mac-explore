@@ -18,10 +18,12 @@ func independentAppProcesses() async throws {
 
     let first = try await InstanceLauncher.launch(applicationURL: appURL, arguments: [
         "--demo", "--folder", directory.path, "--diagnostics-file", firstReport.path,
+        "--support-directory", directory.appendingPathComponent("support").path,
     ], activates: false)
     defer { if !first.isTerminated { first.forceTerminate() } }
     let second = try await InstanceLauncher.launch(applicationURL: appURL, arguments: [
         "--folder", directory.path, "--diagnostics-file", secondReport.path,
+        "--support-directory", directory.appendingPathComponent("support").path,
     ], activates: false)
     defer { if !second.isTerminated { second.forceTerminate() } }
 

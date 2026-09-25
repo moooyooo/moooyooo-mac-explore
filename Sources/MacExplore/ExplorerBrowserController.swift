@@ -8,10 +8,18 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     private(set) var directory: URL
     var onLocationChange: ((URL) -> Void)?
     var onLoadFinished: (() -> Void)?
+    var onSettingsChange: (() -> Void)?
+    var onOpenInNewPane: ((URL) -> Void)?
+    private var settings: BrowserSettings
     private var history = NavigationHistory()
     private var entries: [FileEntry] = []
     private var visibleEntries: [FileEntry] = []
     private var loadTask: Task<Void, Never>?
+    private var projectionTask: Task<Void, Never>?
+    private var watchTask: Task<Void, Never>?
+    private var refreshTask: Task<Void, Never>?
+    private var watchedURL: URL?
+    private var projectionGeneration = UUID()
     private var generation = UUID()
     private(set) var loading = false
     private var errorMessage: String?
@@ -20,12 +28,15 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     let search = NSSearchField()
     let table = FileTableView()
     private let scroll = NSScrollView()
-    private let sidebar = FlippedView()
+    private let tree = FolderTreeController()
+    private let divider = DragHandle()
+    private let breadcrumb = NSPathControl()
+    private var originalTreeWidth: Double = 160
+    private var configuring = true
     private let status = NSTextField(labelWithString: "")
     private let hiddenToggle = NSButton(checkboxWithTitle: "隠し項目", target: nil, action: nil)
     private var navButtons: [NSButton] = []
-    private var places: [NSButton] = []
-    private var showHidden = false
+    private var watchWarning: String?
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .short
@@ -35,16 +46,17 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
 
     enum Navigation { case visit, back, forward, reload }
 
-    init(paneID: UUID, directory: URL) {
+    init(paneID: UUID, directory: URL, settings: BrowserSettings = .init()) {
         self.paneID = paneID
         self.directory = directory
+        self.settings = settings
         super.init(nibName: nil, bundle: nil)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    deinit { loadTask?.cancel() }
+    deinit { loadTask?.cancel(); projectionTask?.cancel(); watchTask?.cancel(); refreshTask?.cancel() }
 
     override func loadView() {
         view = root
@@ -73,20 +85,24 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         search.placeholderString = "このフォルダ内を検索"
         search.setAccessibilityLabel("このフォルダ内を検索")
         search.delegate = self
+        search.stringValue = settings.filter
         root.addSubview(search)
         hiddenToggle.target = self
         hiddenToggle.action = #selector(toggleHidden)
         hiddenToggle.font = .systemFont(ofSize: 11)
+        hiddenToggle.state = settings.showHidden ? .on : .off
         root.addSubview(hiddenToggle)
 
         let columns: [(String, String, CGFloat)] = [
             ("name", "名前", 240), ("modified", "更新日時", 140), ("kind", "種類", 100), ("size", "サイズ", 80),
         ]
-        for (key, title, width) in columns {
+        for stored in settings.columns {
+            guard let (key, title, _) = columns.first(where: { $0.0 == stored.column.rawValue }) else { continue }
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(key))
             column.title = title
-            column.width = width
+            column.width = stored.width
             column.minWidth = 60
+            column.maxWidth = 2_400
             column.sortDescriptorPrototype = NSSortDescriptor(key: key, ascending: true)
             table.addTableColumn(column)
         }
@@ -101,7 +117,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         table.onOpen = { [weak self] in self?.openSelected() }
         table.onBack = { [weak self] in self?.goBack() }
         table.setAccessibilityLabel("ファイル一覧")
-        table.sortDescriptors = [NSSortDescriptor(key: "name", ascending: true)]
+        table.sortDescriptors = [NSSortDescriptor(key: settings.sortColumn.rawValue, ascending: settings.ascending)]
         scroll.documentView = table
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = true
@@ -109,25 +125,41 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         scroll.borderType = .bezelBorder
         root.addSubview(scroll)
 
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let shortcuts: [(String, String, URL)] = [
-            ("ホーム", "house", home),
-            ("ダウンロード", "arrow.down.circle", home.appendingPathComponent("Downloads", isDirectory: true)),
-            ("コンピュータ", "internaldrive", URL(fileURLWithPath: "/", isDirectory: true)),
-            ("ボリューム", "externaldrive", URL(fileURLWithPath: "/Volumes", isDirectory: true)),
-        ]
-        for (name, icon, url) in shortcuts {
-            let button = ActionButton(name, symbol: icon) { [weak self] in self?.navigate(to: url) }
-            button.isBordered = false
-            button.alignment = .left
-            sidebar.addSubview(button)
-            places.append(button)
+        breadcrumb.pathStyle = .standard
+        breadcrumb.isEditable = false
+        breadcrumb.target = self
+        breadcrumb.action = #selector(clickedBreadcrumb)
+        breadcrumb.doubleAction = #selector(clickedBreadcrumb)
+        breadcrumb.url = directory
+        breadcrumb.setAccessibilityLabel("フォルダのパンくず")
+        root.addSubview(breadcrumb)
+        addChild(tree)
+        root.addSubview(tree.view)
+        tree.onNavigate = { [weak self] url in self?.navigate(to: url) }
+        tree.onExpandedChange = { [weak self] urls in self?.settings.expandedDirectories = urls; self?.onSettingsChange?() }
+        tree.configure(expanded: settings.expandedDirectories, favorites: settings.favorites, showHidden: settings.showHidden)
+        divider.wantsLayer = true
+        divider.layer?.backgroundColor = NSColor.separatorColor.cgColor
+        divider.setAccessibilityElement(true)
+        divider.setAccessibilityRole(.button)
+        divider.setAccessibilityLabel("フォルダツリーの幅を変更")
+        divider.onBegin = { [weak self] in self?.originalTreeWidth = self?.settings.treeWidth ?? 160 }
+        divider.onDrag = { [weak self] dx, _ in
+            guard let self else { return }
+            self.settings.treeWidth = min(500, max(100, self.originalTreeWidth + dx))
+            self.layoutContents(); self.onSettingsChange?()
         }
-        root.addSubview(sidebar)
+        divider.onKeyboardAction = { [weak self] in
+            guard let self else { return }
+            self.settings.treeWidth = self.settings.treeWidth >= 300 ? 100 : self.settings.treeWidth + 50
+            self.layoutContents(); self.onSettingsChange?()
+        }
+        root.addSubview(divider)
         status.font = .systemFont(ofSize: 11)
         status.textColor = .secondaryLabelColor
         status.lineBreakMode = .byTruncatingTail
         root.addSubview(status)
+        configuring = false
     }
 
     override func viewDidLoad() {
@@ -143,11 +175,13 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         address.frame = NSRect(x: 95, y: 7, width: max(40, width - 134), height: 24)
         hiddenToggle.frame = NSRect(x: 8, y: 38, width: 96, height: 24)
         search.frame = NSRect(x: 111, y: 39, width: max(60, width - 119), height: 24)
-        let sidebarWidth: CGFloat = width >= 540 ? 125 : 0
-        sidebar.isHidden = sidebarWidth == 0
-        sidebar.frame = NSRect(x: 5, y: 70, width: sidebarWidth, height: max(0, height - 96))
-        for (i, button) in places.enumerated() { button.frame = NSRect(x: 0, y: CGFloat(i) * 29, width: 124, height: 27) }
-        scroll.frame = NSRect(x: 5 + sidebarWidth, y: 70, width: max(0, width - sidebarWidth - 10), height: max(0, height - 96))
+        breadcrumb.frame = NSRect(x: 7, y: 68, width: max(0, width - 14), height: 22)
+        let sidebarWidth: CGFloat = width >= 500 ? min(settings.treeWidth, width * 0.42) : 0
+        tree.view.isHidden = sidebarWidth == 0
+        divider.isHidden = sidebarWidth == 0
+        tree.view.frame = NSRect(x: 5, y: 95, width: sidebarWidth, height: max(0, height - 121))
+        divider.frame = NSRect(x: 5 + sidebarWidth, y: 95, width: 5, height: max(0, height - 121))
+        scroll.frame = NSRect(x: 10 + sidebarWidth, y: 95, width: max(0, width - sidebarWidth - 15), height: max(0, height - 121))
         status.frame = NSRect(x: 8, y: max(0, height - 23), width: max(0, width - 32), height: 18)
     }
 
@@ -160,13 +194,15 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         errorMessage = nil
         status.stringValue = "読み込み中…"
         address.stringValue = url.path
-        let includeHidden = showHidden
+        let includeHidden = settings.showHidden
         loadTask = Task { [weak self] in
             do {
+                await self?.watch(url)
                 let result = try await DirectoryReader.read(url, showHidden: includeHidden)
                 guard !Task.isCancelled, let self, self.generation == request else { return }
                 self.entries = result
                 self.directory = url
+                self.breadcrumb.url = url
                 switch navigation {
                 case .visit: self.history.visit(url)
                 case .back: self.history.goBack()
@@ -178,11 +214,11 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
                 self.navButtons[1].isEnabled = self.history.forward != nil
                 self.applyFilterAndSort()
                 self.onLocationChange?(url)
-                self.onLoadFinished?()
+                self.tree.refresh(url)
             } catch {
                 guard !Task.isCancelled, let self, self.generation == request else { return }
                 self.loading = false
-                self.errorMessage = "開けません: \(error.localizedDescription)"
+                self.errorMessage = Self.locationError(error)
                 self.address.stringValue = self.directory.path
                 self.updateStatus()
                 self.onLoadFinished?()
@@ -190,7 +226,13 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         }
     }
 
-    func stop() { loadTask?.cancel(); loadTask = nil }
+    func stop() {
+        loadTask?.cancel(); loadTask = nil
+        projectionTask?.cancel(); projectionTask = nil
+        watchTask?.cancel(); watchTask = nil
+        refreshTask?.cancel(); refreshTask = nil
+        watchedURL = nil; tree.stop()
+    }
     func reload() { navigate(to: directory, via: history.current == nil ? .visit : .reload) }
     func goBack() { if let url = history.back { navigate(to: url, via: .back) } }
     func goForward() { if let url = history.forward { navigate(to: url, via: .forward) } }
@@ -199,11 +241,40 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     func focusSearch() { view.window?.makeFirstResponder(search) }
     func focusFiles() { view.window?.makeFirstResponder(table) }
 
+    var savedSettings: BrowserSettings {
+        var result = settings
+        result.columns = table.tableColumns.compactMap { column in FileColumn(rawValue: column.identifier.rawValue).map { ColumnSettings($0, width: column.width) } }
+        return result
+    }
+
+    func toggleFavorite() {
+        if settings.favorites.contains(directory) { settings.favorites.removeAll { $0 == directory } }
+        else if settings.favorites.count < 32 { settings.favorites.append(directory) }
+        tree.configure(expanded: settings.expandedDirectories, favorites: settings.favorites, showHidden: settings.showHidden)
+        onSettingsChange?()
+    }
+
+    func openSelectionInNewPane() {
+        guard visibleEntries.indices.contains(table.selectedRow), visibleEntries[table.selectedRow].isBrowsable else { return }
+        onOpenInNewPane?(visibleEntries[table.selectedRow].url)
+    }
+
     func cycleFocus(backward: Bool = false) {
         let editor = view.window?.firstResponder as? NSTextView
         if editor?.delegate === address { backward ? focusFiles() : focusSearch() }
-        else if editor?.delegate === search { backward ? focusAddress() : focusFiles() }
-        else { backward ? focusSearch() : focusAddress() }
+        else if editor?.delegate === search { backward ? focusAddress() : focusTreeOrFiles() }
+        else if view.window?.firstResponder === tree.outline { backward ? focusSearch() : focusFiles() }
+        else if backward {
+            if tree.view.isHidden { focusSearch() } else { focusTreeOrFiles() }
+        } else { focusAddress() }
+    }
+
+    private func focusTreeOrFiles() {
+        if tree.view.isHidden { focusFiles() } else { view.window?.makeFirstResponder(tree.outline) }
+    }
+
+    @objc private func clickedBreadcrumb() {
+        if let url = breadcrumb.clickedPathItem?.url ?? breadcrumb.url { navigate(to: url) }
     }
 
     @objc private func enteredAddress() {
@@ -212,50 +283,95 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         navigate(to: url.standardizedFileURL)
     }
 
-    @objc private func toggleHidden() { showHidden = hiddenToggle.state == .on; reload() }
-
-    @objc func openSelected() {
-        guard visibleEntries.indices.contains(table.selectedRow) else { return }
-        let item = visibleEntries[table.selectedRow]
-        if item.isBrowsable { navigate(to: item.url) }
-        else { NSWorkspace.shared.open(item.url) }
+    @objc private func toggleHidden() {
+        settings.showHidden = hiddenToggle.state == .on
+        tree.configure(expanded: settings.expandedDirectories, favorites: settings.favorites, showHidden: settings.showHidden)
+        onSettingsChange?(); reload()
     }
 
-    func controlTextDidChange(_ obj: Notification) { if obj.object as? NSSearchField === search { applyFilterAndSort() } }
+    @objc func openSelected() {
+        guard !loading, visibleEntries.indices.contains(table.selectedRow) else { return }
+        let item = visibleEntries[table.selectedRow]
+        if item.isBrowsable { navigate(to: item.url) }
+        else if !NSWorkspace.shared.open(item.url) { errorMessage = "既定のアプリで開けませんでした。"; updateStatus() }
+    }
+
+    func controlTextDidChange(_ obj: Notification) {
+        if obj.object as? NSSearchField === search {
+            settings.filter = String(search.stringValue.prefix(1_024))
+            applyFilterAndSort(); onSettingsChange?()
+        }
+    }
 
     private func applyFilterAndSort() {
         let selection = Set(table.selectedRowIndexes.compactMap { visibleEntries.indices.contains($0) ? visibleEntries[$0].url : nil })
-        let query = search.stringValue
-        visibleEntries = entries.filter { query.isEmpty || $0.name.localizedStandardContains(query) }
-        let descriptor = table.sortDescriptors.first
-        let key = descriptor?.key ?? "name"
-        let ascending = descriptor?.ascending ?? true
-        visibleEntries.sort { lhs, rhs in
-            if lhs.isBrowsable != rhs.isBrowsable { return lhs.isBrowsable }
-            let comparison: ComparisonResult
-            switch key {
-            case "size": comparison = (lhs.size ?? 0) == (rhs.size ?? 0) ? .orderedSame : ((lhs.size ?? 0) < (rhs.size ?? 0) ? .orderedAscending : .orderedDescending)
-            case "modified": comparison = (lhs.modified ?? .distantPast).compare(rhs.modified ?? .distantPast)
-            case "kind": comparison = lhs.kind.localizedStandardCompare(rhs.kind)
-            default: comparison = lhs.name.localizedStandardCompare(rhs.name)
-            }
-            if comparison == .orderedSame { return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending }
-            return ascending ? comparison == .orderedAscending : comparison == .orderedDescending
+        projectionTask?.cancel()
+        let request = UUID(); projectionGeneration = request
+        let input = entries, options = settings
+        projectionTask = Task { [weak self] in
+            guard let result = try? await DirectoryReader.project(input, settings: options), !Task.isCancelled,
+                  let self, self.projectionGeneration == request else { return }
+            self.visibleEntries = result
+            self.table.reloadData()
+            self.table.selectRowIndexes(IndexSet(result.indices.filter { selection.contains(result[$0].url) }), byExtendingSelection: false)
+            self.updateStatus()
+            self.onLoadFinished?()
         }
-        table.reloadData()
-        table.selectRowIndexes(IndexSet(visibleEntries.indices.filter { selection.contains(visibleEntries[$0].url) }), byExtendingSelection: false)
-        updateStatus()
     }
 
     private func updateStatus() {
-        status.stringValue = errorMessage ?? "\(visibleEntries.count) 項目" + (table.numberOfSelectedRows > 0 ? " · \(table.numberOfSelectedRows) 項目を選択" : "")
+        status.stringValue = errorMessage ?? "\(visibleEntries.count) 項目" + (table.numberOfSelectedRows > 0 ? " · \(table.numberOfSelectedRows) 項目を選択" : "") + (watchWarning.map { " · \($0)" } ?? "")
         status.toolTip = status.stringValue
         status.textColor = errorMessage == nil ? .secondaryLabelColor : .systemRed
     }
 
     func numberOfRows(in tableView: NSTableView) -> Int { visibleEntries.count }
     func tableViewSelectionDidChange(_ notification: Notification) { updateStatus() }
-    func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) { applyFilterAndSort() }
+    func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
+        guard !configuring else { return }
+        settings.sortColumn = FileColumn(rawValue: table.sortDescriptors.first?.key ?? "name") ?? .name
+        settings.ascending = table.sortDescriptors.first?.ascending ?? true
+        applyFilterAndSort(); onSettingsChange?()
+    }
+    func tableViewColumnDidMove(_ notification: Notification) { if !configuring { onSettingsChange?() } }
+    func tableViewColumnDidResize(_ notification: Notification) { if !configuring { onSettingsChange?() } }
+    func tableView(_ tableView: NSTableView, typeSelectStringFor tableColumn: NSTableColumn?, row: Int) -> String? {
+        visibleEntries.indices.contains(row) ? visibleEntries[row].name : nil
+    }
+
+    private func watch(_ url: URL) async {
+        guard watchedURL != url else { return }
+        watchTask?.cancel(); watchTask = nil; watchedURL = url
+        do {
+            let events = try await DirectoryWatchCenter.shared.events(at: url)
+            guard !Task.isCancelled else { return }
+            watchWarning = nil
+            watchTask = Task { [weak self] in
+                for await _ in events {
+                    guard !Task.isCancelled else { break }
+                    self?.scheduleRefresh(for: url)
+                }
+            }
+        } catch { watchedURL = nil; watchWarning = "自動更新不可・F5で更新" }
+    }
+
+    private func scheduleRefresh(for url: URL) {
+        refreshTask?.cancel()
+        refreshTask = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(200)) } catch { return }
+            guard let self, self.directory == url else { return }
+            self.reload()
+        }
+    }
+
+    private static func locationError(_ error: Error) -> String {
+        let ns = error as NSError
+        if (ns.domain == NSCocoaErrorDomain && ns.code == NSFileReadNoPermissionError) ||
+            (ns.domain == NSPOSIXErrorDomain && [13, 1].contains(ns.code)) { return "アクセス権がありません。フォルダの権限を確認してください。" }
+        if (ns.domain == NSCocoaErrorDomain && [NSFileNoSuchFileError, NSFileReadNoSuchFileError].contains(ns.code)) ||
+            (ns.domain == NSPOSIXErrorDomain && ns.code == 2) { return "フォルダが見つかりません。接続後にF5、またはパスを選び直してください。" }
+        return "開けません: \(error.localizedDescription)"
+    }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let column = tableColumn, visibleEntries.indices.contains(row) else { return nil }

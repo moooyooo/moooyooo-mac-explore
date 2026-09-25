@@ -1,9 +1,9 @@
 # アーキテクチャ方針
 
-更新日: 2026-09-25 / 状態: P1の土台を実装、保存以降は設計段階
+更新日: 2026-09-25 / 状態: MDI、閲覧、保存、排他、構成の復旧を実装
 
-実装・検証の現状は[P1の記録](p1-verification.md)を参照。
-以下のうちプロジェクト形式、排他、復旧、ファイル書込みは今後の実装方針である。
+実装・検証の現状は[P2/P3の記録](p2-p3-verification.md)を参照。
+以下のうち一般ファイルの書込み、セッションの選択・スクロール・履歴は今後の実装方針である。
 
 ## 1. 技術選定
 
@@ -91,7 +91,9 @@ PIDだけで生存や所有権を判定しない。
 Appleも`NSWindow`の直接アーカイブではなく状態復元用の仕組みを案内している。
 参考: [Apple NSWindow](https://developer.apple.com/documentation/appkit/nswindow)。
 
-UTF-8のJSON形式を採用予定。最終スキーマと検証器はP3で追加する。
+UTF-8のJSON形式、`schemaVersion: 1`を実装した。上限と検証規則は[形式の説明](projects.md)を参照。
+`ProjectDocument`を検証してから`Workspace`とAppKitの画面を復元する。
+子の追加順と重なり順は別々に保存し、Ctrl+Tabの順序を維持する。
 
 | 情報 | 主なフィールド案 |
 | --- | --- |
@@ -107,7 +109,7 @@ bookmarkは移動された場所を解決する補助情報として扱い、失
 
 未知の`schemaVersion`では書き戻しを拒否する。移行が必要な場合は元を保全してから行う。
 UUID重複、存在しない`activePaneID`、非有限の座標、範囲外の枠、巨大な入力、
-file以外のURLを検証する。件数・サイズ上限はP3の実測と形式定義で固定する。
+file以外のURLを検証する。初期上限は8 MiB・64子画面／プロジェクトとする。
 プロジェクトにはシェルコマンド、スクリプト、起動時ファイル操作の機能を設けない。
 
 プロジェクトは参照先のパスを含むため、公開サンプルは架空のディレクトリとデータで作る。
@@ -158,6 +160,14 @@ bookmarksや個人のセッションはサンプルへ含めない。
 ツリーは必要な階層のみ、アイコンは可視行から取得し、キャッシュの件数・容量を制限する。
 監視は同一プロセス内で同じフォルダを共有し、イベントをまとめて差分更新する。
 フォーカス復帰・F5・ボリューム再接続時にも整合性を確認する。
+
+現在の実装は`DirectoryReader`の独立Taskで列挙・ソートし、
+`DirectoryWatchCenter`で同じ正規化パスのFSEventsストリームを共有する（上限128）。
+通知は最新1件にまとめ、再読込を200 ms遅延させる。常時ポーリングは行わない。
+POSIX `realpath`の結果でパスを比較し、`/var`と`/private/var`の別表記を揃える。
+ツリーは`NSOutlineView`の展開時に読み込み、畳むと子のキャッシュと読込Taskを破棄する。
+参考: [Apple FSEvents](https://developer.apple.com/documentation/coreservices/file_system_events)、
+[dispatch queueへの登録](https://developer.apple.com/documentation/coreservices/1444164-fseventstreamsetdispatchqueue)。
 
 `OperationService`はファイルAPIを使い、実行計画・衝突判定・実行結果・Undo情報を管理する。
 書込み先を排他的に確保し、処理直前に元と先の同一性・権限を再確認する。

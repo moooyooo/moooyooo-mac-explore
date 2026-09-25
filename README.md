@@ -9,14 +9,18 @@ Windows Explorerの操作感を基本にした、軽量なmacOSネイティブ�
 
 ## 現在の状態
 
-**P1のネイティブアプリ試作を実装しました。現在は閲覧用の開発版です。**
+**閲覧とプロジェクト保存に対応した、バージョン0.2.0の開発版です。**
 
 複数のMDI親ウィンドウ、子画面の移動・サイズ変更・整列・最大化・最小化、
-別プロセス起動を実装しています。フォルダ一覧、パス入力、履歴、列ソート、名前フィルター、
-隠し項目切替も使える構成です。プロジェクト保存とファイルの書き換え操作は今後の工程です。
-実機での画面操作・VoiceOver・最小対応OSの検証は残っています。
+別プロセス起動に加え、フォルダツリー、パンくず、詳細一覧、パス入力、履歴、列ソート、
+名前フィルター、隠し項目、お気に入り、外部変更の自動更新を実装しています。
+`.mexplore`へフォルダ構成・配置・列設定を保存し、復元・切り替えができます。
+同時起動時の保存権、外部変更の検出、プロセス別の復旧も実装しています。
+コピー・移動・名前変更・ゴミ箱などのファイル操作はP4の残作業です。
+マウスでの実操作・IME・VoiceOver・最小対応OSの検証も残っています。
 
-検証結果と制約は[P1の実装記録](docs/p1-verification.md)を参照してください。
+検証結果と制約は[P2/P3の実装記録](docs/p2-p3-verification.md)、
+初期の基準値は[P1の実装記録](docs/p1-verification.md)を参照してください。
 
 2026-09-25に初期仕様を整理しました。プロジェクト名は仮称です。
 管理者・GitHubユーザー名は **[moooyooo](https://github.com/moooyooo)** です。
@@ -64,6 +68,7 @@ flowchart TB
 | [UX・ショートカット](docs/ux.md) | 画面構成、メニュー、キー操作、WindowsとMacの差異 |
 | [アーキテクチャ](docs/architecture.md) | MDI、別プロセス起動、プロジェクト保存と排他制御 |
 | [開発工程](docs/roadmap.md) | 段階ごとの成果物、検証、公開までの条件 |
+| [プロジェクトの操作と形式](docs/projects.md) | 保存・切り替え・競合・復旧、JSON形式の上限 |
 | [開発への参加](CONTRIBUTING.md) | 変更・検証・公開資料の扱い |
 
 ## 開発環境
@@ -85,11 +90,14 @@ open -n "build/Moooyooo Mac Explore.app" --args --folder "$PWD"
 ```
 
 `--folder`を複数回指定すると複数の子画面を開きます。`--demo`は親2つ・各子3つを開きます。
-アプリ生成後、`scripts/test.sh --integration`で実際の別プロセス起動・終了を検証できます。
-テスト用アプリは自動的に終了します。
+保存済みプロジェクトは`--project /path/to/workspace.mexplore`、またはプロジェクトメニューから開けます。
+アプリ生成後、`scripts/test.sh --integration`で実際の別プロセス起動・終了、
+同じプロジェクトの保存権、AppKitの構成復元を検証できます。テスト用アプリは自動的に終了します。
+通常のテストにも、独立したテスト用プロセスでのロック競合・強制終了試験が含まれます。
 
 主なキー操作はCmd/Ctrl+N（子追加）、Cmd/Ctrl+Option+N（親追加）、
 Ctrl+Tab（子切替）、Cmd/Ctrl+L（パス入力）、F5（更新）です。
+Cmd/Ctrl+Oでプロジェクトを開き、Cmd/Ctrl+Sで保存、Cmd/Ctrl+Shift+Sで別名保存します。
 子の右下をドラッグするとサイズを変更できます。キーボードではウィンドウメニューの
 「子画面を移動」「サイズを変更」を選び、矢印・Enter・Escを使います。
 
@@ -100,6 +108,19 @@ Xcodeを選択している環境では通常のSwiftPM設定を利用します�
 現在選択されている開発者ディレクトリはCommand Line Toolsです。
 GitHub Actions用にmacOSでのテスト・Releaseビルドを定義しています。
 GitHubへまだpushしていないため、CI上での結果は未確認です。
+
+### Performance tools
+
+合成データで列挙とソートの処理時間を測れます（画面描画は含みません）。
+
+```sh
+python3 scripts/create-fixture.py .local/fixtures/10000 --count 10000
+swift run -c release BrowserBenchmark .local/fixtures/10000 10
+```
+
+`StorageProbe`と`BrowserBenchmark`は開発・検証用ツールで、配布用`.app`には入りません。
+試験用の`--support-directory`は復旧情報・ロック・最近使った一覧の保存領域を隔離します。
+通常起動では指定せず、同じプロジェクトを扱うプロセス同士では保存領域を統一してください。
 
 ## ライセンス・公開
 

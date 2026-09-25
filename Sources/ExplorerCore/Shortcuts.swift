@@ -3,6 +3,9 @@ public enum AppCommand: Int, Sendable {
     case back, forward, up, refresh, focusAddress, focusSearch
     case nextPane, previousPane, maximize, minimize, columns, rows, cascade, move, resize
     case shortcuts, diagnostics
+    case openProject, switchProject, saveProject, saveProjectAs, reacquireProject, recoverSession
+    case projectInNewInstance
+    case favorite, openInNewPane
 }
 
 public struct KeyModifiers: OptionSet, Sendable {
@@ -27,7 +30,7 @@ public enum Shortcuts {
         guard !composingText else { return nil }
         let key = key.lowercased()
         if flags == .command || flags == .control {
-            let commands: [String: AppCommand] = ["n": .newPane, "w": .closePane, "l": .focusAddress, "r": .refresh, "f": .focusSearch]
+            let commands: [String: AppCommand] = ["n": .newPane, "w": .closePane, "l": .focusAddress, "r": .refresh, "f": .focusSearch, "s": .saveProject, "o": .openProject]
             if let command = commands[key] { return .command(command) }
             if flags == .command, !editingText {
                 if key == "[" { return .command(.back) }
@@ -45,6 +48,8 @@ public enum Shortcuts {
             if key == "n" { return .command(.newWindow) }
         } else if flags == [.command, .shift] || flags == [.control, .shift] {
             if key == "w" { return .command(.closeWindow) }
+            if key == "s" { return .command(.saveProjectAs) }
+            if key == "o" { return .command(.openFolder) }
             if flags == [.control, .shift], code == 48 { return .command(.previousPane) }
         } else if flags == .option, !editingText {
             if code == 123 { return .command(.back) }
