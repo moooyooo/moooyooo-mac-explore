@@ -83,6 +83,13 @@
 "recoverSession" = "Recover Interrupted Session…";
 "menuEdit" = "Edit";
 "undo" = "Undo";
+"undoFileAction" = "Undo %@ (%ld)";
+"undoReplacementUnavailable" = "Cannot Undo Replacement";
+"undoIncompleteUnavailable" = "Cannot Undo Partial Result";
+"undoFileScope" = "Up to 20 operation groups from this process can be undone until you quit. Files are checked for outside changes before Undo.";
+"undoReplacementDetail" = "The last operation replaced an existing item. Replacement cannot be undone here. Check Trash, or Interrupted File Operations if cleanup failed, for the previous item.";
+"undoIncompleteDetail" = "The last operation retained files but could not record a complete Undo group. Check the operation results and retained files before continuing.";
+"moveAction" = "Move";
 "cut" = "Cut";
 "copy" = "Copy";
 "paste" = "Paste";
@@ -207,3 +214,9 @@
 "revealRetainedOperations" = "Show Retained Data in Finder";
 "fileCommittedWarning" = "The destination was created at %@, but verification or the move receipt could not finish. Check it before retrying. %@";
 "trashedWithoutUndo" = "The item was moved to Trash at %@, but Undo could not be registered. Restore it using Finder if needed. %@";
+"fieldSession" = "browser recovery state";
+"shortcutPreset" = "Keyboard Controls";
+"shortcutExplorer" = "Explorer (Control and Command)";
+"shortcutMac" = "Mac (Command)";
+"shortcutAlternative" = "Also available: %@";
+"shortcutsBodyMac" = "New Explorer: Cmd+N\nNew MDI window: Cmd+Option+N\nClose Explorer / window: Cmd+W / Cmd+Shift+W\nNext / previous Explorer: Control+Tab / Control+Shift+Tab\nEnter path / filter: Cmd+L / Cmd+F\nBack / forward: Cmd+[ / Cmd+]\nParent folder: Cmd+↑\nRefresh: Cmd+R / F5\nNew folder: Cmd+Shift+N\nRename: F2\nCopy / cut / paste: Cmd+C / Cmd+X / Cmd+V\nUndo: Cmd+Z\nMove to Trash: Cmd+Backspace\nOpen / save project: Cmd+O / Cmd+S\nSave project as: Cmd+Shift+S\nContext menu: Shift+F10\nMove / resize Explorer: Window menu\n\nControl text-editing and system bindings remain available. VoiceOver modifier keys are passed to VoiceOver.";

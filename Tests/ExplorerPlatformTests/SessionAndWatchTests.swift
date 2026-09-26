@@ -37,6 +37,45 @@ import ExplorerCore
     try await reader.finish()
 }
 
+@Test func browserRecoveryPersistsPrivatelyAndInvalidUpdatesPreservePriorState() async throws {
+    let fixture = try StorageFixture(); defer { fixture.cleanup() }
+    let id = UUID()
+    let store = SessionStore(instanceID: id, supportDirectory: fixture.support)
+    try await store.start()
+    let document = fixture.document()
+    let pane = try #require(document.panes.first)
+    let history = try NavigationHistory(entries: [pane.folder.url], index: 0)
+    let state = BrowserSession(history: history, selectedNames: ["資料.txt"], topVisibleName: "資料.txt", rowOffset: 5)
+    var recovery = RecoveryWorkspace(document: document, sourceURL: fixture.project, browserStates: [RecoveryPane(id: pane.id, state: state)])
+    try await store.update([recovery])
+    let file = fixture.support.appendingPathComponent("Sessions/\(id.uuidString).json")
+    let baseline = try Data(contentsOf: file)
+    let decoded = try JSONDecoder().decode(RecoverySession.self, from: baseline)
+    #expect(decoded.workspaces.first?.browserStates?.first?.state == state)
+    #expect(try ItemIdentity.read(file).mode & 0o777 == 0o600)
+    recovery.browserStates = [RecoveryPane(id: UUID(), state: state)]
+    await #expect(throws: (any Error).self) { try await store.update([recovery]) }
+    #expect(try Data(contentsOf: file) == baseline)
+    var wrongFolder = state
+    wrongFolder.history = try NavigationHistory(entries: [URL(fileURLWithPath: "/tmp/different")], index: 0)
+    recovery.browserStates = [RecoveryPane(id: pane.id, state: wrongFolder)]
+    await #expect(throws: (any Error).self) { try await store.update([recovery]) }
+    #expect(try Data(contentsOf: file) == baseline)
+    let projectJSON = String(decoding: try document.encoded(), as: UTF8.self)
+    #expect(!projectJSON.contains("selectedNames") && !projectJSON.contains("rowOffset"))
+    try await store.finish()
+}
+
+@Test func recoveryWithoutBrowserStateRemainsCompatible() throws {
+    let fixture = try StorageFixture(); defer { fixture.cleanup() }
+    let previous = RecoveryWorkspace(document: fixture.document(), sourceURL: nil)
+    let data = try JSONEncoder().encode(previous)
+    #expect(!String(decoding: data, as: UTF8.self).contains("browserStates"))
+    let decoded = try JSONDecoder().decode(RecoveryWorkspace.self, from: data)
+    try decoded.validate()
+    #expect(decoded.browserStates == nil)
+}
+
 @Test func concurrentRecentUpdatesMergeInsteadOfOverwriting() async throws {
     let fixture = try StorageFixture(); defer { fixture.cleanup() }
     let first = RecentProjectStore(supportDirectory: fixture.support), second = RecentProjectStore(supportDirectory: fixture.support)
@@ -57,6 +96,18 @@ import ExplorerCore
 private actor EventCounter {
     var count = 0
     func increment() { count += 1 }
+}
+
+@Test func unusedDirectorySubscriptionIsReleased() async throws {
+    let fixture = try StorageFixture(); defer { fixture.cleanup() }
+    let center = DirectoryWatchCenter()
+    // Navigation can be cancelled after registration but before iteration starts.
+    _ = try await center.events(at: fixture.root)
+    for _ in 0..<100 {
+        if await center.watchedDirectoryCount == 0 { return }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(await center.watchedDirectoryCount == 0)
 }
 
 @Test(arguments: [false, true]) func watchersShareStreamsDetectContentChangesAndReleaseOnCancellation(inTemporaryDirectory: Bool) async throws {

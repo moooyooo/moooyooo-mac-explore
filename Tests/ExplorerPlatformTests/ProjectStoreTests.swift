@@ -20,6 +20,16 @@ struct StorageFixture {
     }
 }
 
+@Test func explicitLeaseReleaseIsIdempotentAndAllowsImmediateReacquisition() throws {
+    let fixture = try StorageFixture(); defer { fixture.cleanup() }
+    let first = try #require(try AdvisoryLease.acquire(key: "test", directory: fixture.support))
+    first.release()
+    let second = try #require(try AdvisoryLease.acquire(key: "test", directory: fixture.support))
+    defer { second.release() }
+    first.release() // Must not close a descriptor subsequently reused for the next owner.
+    #expect(try AdvisoryLease.acquire(key: "test", directory: fixture.support) == nil)
+}
+
 @Test func savingReloadingAndCompetingOwners() async throws {
     let fixture = try StorageFixture(); defer { fixture.cleanup() }
     let first = ProjectStore(supportDirectory: fixture.support), second = ProjectStore(supportDirectory: fixture.support)

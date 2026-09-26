@@ -1,10 +1,34 @@
 import Foundation
 import ExplorerCore
 
+public struct RecoveryPane: Codable, Equatable, Sendable {
+    public var id: UUID
+    public var state: BrowserSession
+    public init(id: UUID, state: BrowserSession) { self.id = id; self.state = state }
+}
+
 public struct RecoveryWorkspace: Codable, Sendable {
     public var document: ProjectDocument
     public var sourceURL: URL?
-    public init(document: ProjectDocument, sourceURL: URL?) { self.document = document; self.sourceURL = sourceURL }
+    public var browserStates: [RecoveryPane]?
+    public init(document: ProjectDocument, sourceURL: URL?, browserStates: [RecoveryPane]? = nil) {
+        self.document = document; self.sourceURL = sourceURL; self.browserStates = browserStates
+    }
+    public func validate() throws {
+        try document.validate()
+        guard sourceURL.map(ProjectDocument.isLocalFileURL) ?? true else { throw StorageError.invalidFile }
+        if let browserStates {
+            let ids = browserStates.map(\.id), panes = Dictionary(uniqueKeysWithValues: document.panes.map { ($0.id, $0) })
+            guard ids.count <= document.panes.count, Set(ids).count == ids.count else { throw StorageError.invalidFile }
+            for browser in browserStates {
+                guard let pane = panes[browser.id] else { throw StorageError.invalidFile }
+                try browser.state.validate()
+                if let current = browser.state.history.current {
+                    guard current.standardizedFileURL == pane.folder.url.standardizedFileURL else { throw StorageError.invalidFile }
+                }
+            }
+        }
+    }
 }
 
 public struct RecoverySession: Codable, Sendable, Identifiable {
@@ -35,7 +59,7 @@ public actor SessionStore {
     public func update(_ workspaces: [RecoveryWorkspace]) throws {
         guard lease != nil else { throw StorageError.closed }
         guard workspaces.count <= 32 else { throw ProjectError.tooLarge }
-        for workspace in workspaces { try workspace.document.validate() }
+        for workspace in workspaces { try workspace.validate() }
         let session = RecoverySession(id: instanceID, updated: Date(), workspaces: workspaces)
         let data = try JSONEncoder().encode(session)
         guard data.count <= ProjectDocument.maximumBytes else { throw ProjectError.tooLarge }
@@ -49,10 +73,11 @@ public actor SessionStore {
         for url in urls where url.pathExtension == "json" {
             guard let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent), id != instanceID,
                   let candidate = try AdvisoryLease.acquire(key: id.uuidString, directory: directory.appendingPathComponent("Locks")) else { continue }
+            defer { candidate.release() }
             try? withExtendedLifetime(candidate) {
                 let session = try JSONDecoder().decode(RecoverySession.self, from: StorageIO.read(url))
                 guard session.id == id, session.workspaces.count <= 32 else { return }
-                for workspace in session.workspaces { try workspace.document.validate() }
+                for workspace in session.workspaces { try workspace.validate() }
                 if !session.workspaces.isEmpty { sessions.append(session) }
             }
         }
@@ -62,11 +87,14 @@ public actor SessionStore {
     public func claim(_ id: UUID) throws -> RecoverySession {
         guard id != instanceID, claimed[id] == nil,
               let candidate = try AdvisoryLease.acquire(key: id.uuidString, directory: directory.appendingPathComponent("Locks")) else { throw StorageError.locked }
+        var handedOff = false
+        defer { if !handedOff { candidate.release() } }
         return try withExtendedLifetime(candidate) {
             let session = try JSONDecoder().decode(RecoverySession.self, from: StorageIO.read(sessionURL(id)))
             guard session.id == id, session.workspaces.count <= 32 else { throw StorageError.invalidFile }
-            for workspace in session.workspaces { try workspace.document.validate() }
+            for workspace in session.workspaces { try workspace.validate() }
             claimed[id] = candidate
+            handedOff = true
             return session
         }
     }
@@ -74,14 +102,14 @@ public actor SessionStore {
     public func finishClaim(_ id: UUID, consumed: Bool) throws {
         guard claimed[id] != nil else { throw StorageError.closed }
         if consumed { try FileManager.default.removeItem(at: sessionURL(id)) }
-        claimed.removeValue(forKey: id)
+        claimed.removeValue(forKey: id)?.release()
     }
 
     public func finish() throws {
         guard lease != nil else { return }
         let url = sessionURL(instanceID)
         if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
-        lease = nil
+        lease?.release(); lease = nil
     }
 
     private func sessionURL(_ id: UUID) -> URL { directory.appendingPathComponent(id.uuidString + ".json") }
@@ -101,6 +129,7 @@ public actor RecentProjectStore {
         // Short, cancellable contention retries; always reread while holding the lock.
         for _ in 0..<40 {
             if let lease = try AdvisoryLease.acquire(key: "recent-projects", directory: directory.appendingPathComponent("Locks")) {
+                defer { lease.release() }
                 try withExtendedLifetime(lease) {
                     let file = directory.appendingPathComponent("RecentProjects.json")
                     let previous = try StorageIO.existingData(file)

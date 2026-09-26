@@ -9,9 +9,14 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     var onLocationChange: ((URL) -> Void)?
     var onLoadFinished: (() -> Void)?
     var onSettingsChange: (() -> Void)?
+    var onSessionChange: (() -> Void)?
     var onOpenInNewPane: ((URL) -> Void)?
     weak var fileOperations: FileOperationController?
     private var pendingSelection: Set<String>?
+    private var pendingRestoration: BrowserSession?
+    private var restoringViewport = false
+    private var rememberedViews: [URL: BrowserSession] = [:]
+    private var rememberedOrder: [URL] = []
     private let dropPlanner = FileDropPlanner()
     private struct DropRequest: Equatable {
         let sources: [URL]
@@ -42,6 +47,8 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     private var projectionGeneration = UUID()
     private var generation = UUID()
     private(set) var loading = false
+    private var reading = false
+    var readyItemCount: Int? { !loading && errorMessage == nil ? visibleEntries.count : nil }
     private var errorMessage: String?
     private let root = LayoutView()
     let address = NSTextField()
@@ -148,6 +155,9 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
         scroll.borderType = .bezelBorder
+        scroll.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(viewportChanged(_:)),
+            name: NSView.boundsDidChangeNotification, object: scroll.contentView)
         root.addSubview(scroll)
 
         breadcrumb.pathStyle = .standard
@@ -214,19 +224,30 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
 
     func navigate(to url: URL, via navigation: Navigation = .visit) {
         guard url.isFileURL else { return }
+        if url.standardizedFileURL != directory.standardizedFileURL {
+            let key = directory.standardizedFileURL
+            rememberedViews[key] = savedSession
+            rememberedOrder.removeAll { $0 == key }; rememberedOrder.append(key)
+            if rememberedOrder.count > 20 { rememberedViews.removeValue(forKey: rememberedOrder.removeFirst()) }
+            pendingRestoration = nil; pendingSelection = nil
+        }
         loadTask?.cancel()
+        projectionTask?.cancel(); projectionGeneration = UUID()
         let request = UUID()
         generation = request
         loading = true
+        reading = true
         errorMessage = nil
         status.stringValue = L10n.text(.loading)
         address.stringValue = url.path
         let includeHidden = settings.showHidden
         loadTask = Task { [weak self] in
+            guard !Task.isCancelled else { return }
             do {
-                await self?.watch(url)
+                self?.watch(url)
                 let result = try await DirectoryReader.read(url, showHidden: includeHidden)
                 guard !Task.isCancelled, let self, self.generation == request else { return }
+                let changedLocation = self.directory.standardizedFileURL != url.standardizedFileURL
                 self.entries = result
                 self.directory = url
                 self.breadcrumb.url = url
@@ -236,17 +257,25 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
                 case .forward: self.history.goForward()
                 case .reload: break
                 }
-                self.loading = false
+                if changedLocation {
+                    var previousView = self.rememberedViews[url.standardizedFileURL] ?? BrowserSession()
+                    previousView.history = self.history
+                    self.pendingRestoration = previousView
+                }
+                self.reading = false
                 self.navButtons[0].isEnabled = self.history.back != nil
                 self.navButtons[1].isEnabled = self.history.forward != nil
                 self.applyFilterAndSort()
                 self.onLocationChange?(url)
                 self.tree.refresh(url)
+                self.onSessionChange?()
             } catch {
                 guard !Task.isCancelled, let self, self.generation == request else { return }
                 self.loading = false
+                self.reading = false
                 self.errorMessage = Self.locationError(error)
                 self.address.stringValue = self.directory.path
+                self.watch(self.directory)
                 self.updateStatus()
                 self.onLoadFinished?()
             }
@@ -259,6 +288,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         watchTask?.cancel(); watchTask = nil
         refreshTask?.cancel(); refreshTask = nil
         dropTask?.cancel(); dropTask = nil; dropRequest = nil; dropKind = nil
+        NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: scroll.contentView)
         watchedURL = nil; tree.stop()
     }
     func reload() { navigate(to: directory, via: history.current == nil ? .visit : .reload) }
@@ -273,6 +303,44 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         var result = settings
         result.columns = table.tableColumns.compactMap { column in FileColumn(rawValue: column.identifier.rawValue).map { ColumnSettings($0, width: column.width) } }
         return result
+    }
+
+    var savedSession: BrowserSession {
+        if let pendingRestoration { return pendingRestoration }
+        let range = table.rows(in: table.visibleRect)
+        let index = range.location == NSNotFound ? 0 : range.location
+        let topName = visibleEntries.indices.contains(index) ? visibleEntries[index].name : nil
+        let offset = topName == nil ? 0 : max(0, min(100, scroll.contentView.bounds.minY - table.rect(ofRow: index).minY))
+        let selected = table.selectedRowIndexes.prefix(BrowserSession.maximumSelection).compactMap {
+            visibleEntries.indices.contains($0) ? visibleEntries[$0].name : nil
+        }
+        return BrowserSession(history: history, selectedNames: selected, topVisibleName: topName,
+                              topVisibleIndex: index, rowOffset: offset, horizontalOffset: max(0, scroll.contentView.bounds.minX))
+    }
+
+    func restoreSession(_ state: BrowserSession) throws {
+        try state.validate()
+        if let current = state.history.current, current.standardizedFileURL != directory.standardizedFileURL {
+            throw ProjectError.invalid(L10n.text(.fieldSession))
+        }
+        history = state.history
+        pendingRestoration = state
+        navigate(to: directory, via: history.current == nil ? .visit : .reload)
+    }
+
+    @objc private func viewportChanged(_ notification: Notification) {
+        if !loading && !restoringViewport { onSessionChange?() }
+    }
+
+    private func restoreViewport(_ state: BrowserSession) {
+        view.layoutSubtreeIfNeeded()
+        let row = state.topVisibleName.flatMap { name in visibleEntries.firstIndex { $0.name == name } }
+            ?? min(state.topVisibleIndex, max(0, visibleEntries.count - 1))
+        let y = visibleEntries.isEmpty ? 0 : table.rect(ofRow: row).minY + state.rowOffset
+        let clip = scroll.contentView
+        let frame = NSRect(origin: NSPoint(x: state.horizontalOffset, y: y), size: clip.bounds.size)
+        clip.scroll(to: clip.constrainBoundsRect(frame).origin)
+        scroll.reflectScrolledClipView(clip)
     }
 
     func toggleFavorite() {
@@ -334,6 +402,8 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     }
 
     private func applyFilterAndSort() {
+        guard !reading else { return } // A pending enumeration will use the latest settings.
+        loading = true
         let selection = Set(table.selectedRowIndexes.compactMap { visibleEntries.indices.contains($0) ? visibleEntries[$0].url : nil })
         projectionTask?.cancel()
         let request = UUID(); projectionGeneration = request
@@ -342,13 +412,21 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
             guard let result = try? await DirectoryReader.project(input, settings: options), !Task.isCancelled,
                   let self, self.projectionGeneration == request else { return }
             self.visibleEntries = result
+            self.loading = false
+            self.restoringViewport = true
+            defer { self.restoringViewport = false }
             self.table.reloadData()
             let pending = self.pendingSelection
             self.pendingSelection = nil
-            self.table.selectRowIndexes(IndexSet(result.indices.filter { pending?.contains(result[$0].name) ?? selection.contains(result[$0].url) }), byExtendingSelection: false)
-            if pending != nil, self.table.selectedRow >= 0 { self.table.scrollRowToVisible(self.table.selectedRow) }
+            let restoration = self.pendingRestoration
+            self.pendingRestoration = nil
+            let selectedNames = pending ?? restoration.map { Set($0.selectedNames) }
+            self.table.selectRowIndexes(IndexSet(result.indices.filter { selectedNames?.contains(result[$0].name) ?? selection.contains(result[$0].url) }), byExtendingSelection: false)
+            if let restoration { self.restoreViewport(restoration) }
+            else if pending != nil, self.table.selectedRow >= 0 { self.table.scrollRowToVisible(self.table.selectedRow) }
             self.updateStatus()
             self.onLoadFinished?()
+            self.onSessionChange?()
         }
     }
 
@@ -415,6 +493,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
             if view.window?.firstResponder === tree.outline { return tree.selectedURL != nil }
             return selectedURLs.count == 1 && visibleEntries.contains { $0.url == selectedURLs.first && $0.isBrowsable }
         }
+        if command == .undoFiles { fileOperations?.configureUndoMenuItem(item) }
         return fileOperations?.canPerform(command, in: self) == true
     }
 
@@ -467,7 +546,10 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         dropRequest = nil; dropKind = nil; dropTask = nil
         return true
     }
-    func tableViewSelectionDidChange(_ notification: Notification) { updateStatus() }
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        updateStatus()
+        if !restoringViewport { onSessionChange?() }
+    }
     func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
         guard !configuring else { return }
         settings.sortColumn = FileColumn(rawValue: table.sortDescriptors.first?.key ?? "name") ?? .name
@@ -480,20 +562,26 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         visibleEntries.indices.contains(row) ? visibleEntries[row].name : nil
     }
 
-    private func watch(_ url: URL) async {
+    private func watch(_ url: URL) {
         guard watchedURL != url else { return }
         watchTask?.cancel(); watchTask = nil; watchedURL = url
-        do {
-            let events = try await DirectoryWatchCenter.shared.events(at: url)
-            guard !Task.isCancelled else { return }
-            watchWarning = nil
-            watchTask = Task { [weak self] in
+        watchWarning = nil
+        // Own registration and iteration in one task. Cancelling a directory read
+        // must not leave watchedURL pointing to a subscription that never started.
+        watchTask = Task { [weak self] in
+            do {
+                let events = try await DirectoryWatchCenter.shared.events(at: url)
                 for await _ in events {
                     guard !Task.isCancelled else { break }
                     self?.scheduleRefresh(for: url)
                 }
+            } catch {
+                guard !Task.isCancelled else { return }
+                self?.watchedURL = nil
+                self?.watchWarning = L10n.text(.watchUnavailable)
+                if self?.loading == false { self?.updateStatus() }
             }
-        } catch { watchedURL = nil; watchWarning = L10n.text(.watchUnavailable) }
+        }
     }
 
     private func scheduleRefresh(for url: URL) {

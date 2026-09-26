@@ -31,6 +31,8 @@ jobs:
         run: scripts/build-app.sh release
       - name: Test including real app processes and packaged languages
         run: scripts/test.sh --integration
+      - name: Test separate APFS volume and real disk-full failure
+        run: scripts/test-volumes.sh
       - name: Verify development distribution
         run: scripts/package-release.sh --development
       - name: Check whitespace

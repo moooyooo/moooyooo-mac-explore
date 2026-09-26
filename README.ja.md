@@ -11,7 +11,7 @@ Windows Explorerの操作感を基本にした、軽量なmacOSネイティブ�
 
 ## 現在の状態
 
-**閲覧・プロジェクト保存・基本ファイル操作に対応した、バージョン0.4.0の開発版です。**
+**閲覧・プロジェクト保存・セッション復旧・基本ファイル操作に対応した、バージョン0.5.0の開発版です。**
 
 複数のMDI親ウィンドウ、子画面の移動・サイズ変更・整列・最大化・最小化、
 別プロセス起動に加え、フォルダツリー、パンくず、詳細一覧、パス入力、履歴、列ソート、
@@ -20,11 +20,14 @@ Windows Explorerの操作感を基本にした、軽量なmacOSネイティブ�
 同時起動時の保存権、外部変更の検出、プロセス別の復旧も実装しています。
 フォルダ作成・名前変更・コピー・切り取り／貼り付け・ゴミ箱・限定したUndoを実装しました。
 同名衝突の選択、進捗・取消、右クリックメニュー、ファイルURLのDnDも接続しています。
-合成データの保全・AppKitの操作テストを実施し、Finderと実ボリューム間の検証は残っています。
+合成データの保全・AppKitの操作・専用APFSボリューム間の移動と実際の容量不足を検証しました。
+Finder連携と物理的な外部ドライブ・ネットワークでの検証は残っています。
 [ファイル操作の使い方と制約](docs/file-operations.md)を参照してください。
 マウスでの実操作・IME・VoiceOver・最小対応OSの検証も残っています。
 
-検証結果と制約は[P2/P3の実装記録](docs/p2-p3-verification.md)、
+異常終了したセッションから、各Explorerの選択・スクロール位置・戻る／進む履歴も復旧できます。
+これらは個人用の復旧情報へ保存し、共有するプロジェクト形式はバージョン1を維持しています。
+検証結果と制約は[P5の検証記録](docs/p5-verification.md)、[P2/P3の実装記録](docs/p2-p3-verification.md)、
 初期の基準値は[P1の実装記録](docs/p1-verification.md)を参照してください。
 
 ## 画面
@@ -71,6 +74,15 @@ flowchart TB
 アプリ名メニューの「言語 / Language」から選び、次回起動から反映します。
 起動中の別プロセスと、保存済みのプロジェクト名・ファイル名には影響しません。
 一時的に英語で開く場合は、起動引数 `--language en` を指定できます。
+
+## キー操作の切り替え
+
+アプリ名メニューの「キー操作」から「Explorer」「Mac」を選べます。
+既定のExplorerはControl系とCommand系を併用します。MacはCommand系を中心とし、
+Control系の文字編集をMacへ渡します。Ctrl+Tabによる子画面切り替えは共通です。
+変更はその場で反映し、別プロセスは次に前面へ戻ったときに保存済み設定を読み込みます。
+`--shortcuts mac` または `--shortcuts explorer` はそのプロセスだけに適用します。
+VoiceOver使用中はControl+OptionとCaps Lockの組み合わせをVoiceOverへ渡します。
 
 ## 設計の軸
 
@@ -138,8 +150,13 @@ GitHubへまだpushしていないため、CI上での結果は未確認です�
 ```sh
 python3 scripts/create-fixture.py .local/fixtures/10000 --count 10000
 swift run -c release BrowserBenchmark .local/fixtures/10000 10
+scripts/benchmark-ui.sh
+scripts/test-volumes.sh
 ```
 
+`benchmark-ui.sh`はRelease版で一覧の描画・起動・メモリ・60秒の待機CPU・50回の子画面開閉を測定します。
+`test-volumes.sh`は128 MiBの専用APFSイメージを作り、別ボリューム操作と実際の容量不足を検証して取り外します。
+結果はGit管理外の`.local/`へ保存します。
 `StorageProbe`と`BrowserBenchmark`は開発・検証用ツールで、配布用`.app`には入りません。
 試験用の`--support-directory`は復旧情報・ロック・最近使った一覧の保存領域を隔離します。
 通常起動では指定せず、同じプロジェクトを扱うプロセス同士では保存領域を統一してください。
@@ -148,6 +165,6 @@ swift run -c release BrowserBenchmark .local/fixtures/10000 10
 
 ライセンスは[MIT](LICENSE)です。英語README・Issueテンプレート・配布スクリプトを追加しました。
 指定により、多言語対応を先に実装してP6の公開準備を進めています。
-日英の画面キャプチャと[0.3.0のリリースノート案](docs/releases/0.3.0.md)を用意しました。
+日英の画面キャプチャと[0.5.0のリリースノート案](docs/releases/0.5.0.md)を用意しました。
 GitHub公開先・CI実行、Developer ID署名・公証は残作業です。
 検証条件は[配布手順](docs/releasing.md)と[P6の記録](docs/p6-verification.md)を参照してください。

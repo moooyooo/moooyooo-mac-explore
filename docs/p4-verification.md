@@ -1,6 +1,7 @@
 # P4 implementation and verification
 
-Updated 2026-09-26. Version 0.4.0 is a development preview; P4 qualification remains open.
+Updated 2026-09-27. The initial results below describe 0.4.0.
+The 0.5.0 additions are recorded separately; P4 qualification remains open.
 
 ## Implemented
 
@@ -42,10 +43,31 @@ were not terminated. Test data and pasteboards are isolated.
 
 - Finder ↔ app and app ↔ independent process drag sequences, default operation
   cursor feedback and modifier changes during dragging.
-- Physical cross-volume moves, removable/network volumes, permission boundaries,
-  actual full disks and disconnection. Cross-volume failure logic has injection tests.
+- Physical removable/network volumes, permission boundaries and disconnection.
+  A separate APFS image and actual capacity exhaustion are now tested below.
 - Large-file cancellation/progress, manual JIS/US/IME input, focus, VoiceOver and
   supported macOS versions.
 - Interrupted-operation recovery usability and performance qualification.
 
 See [user-facing operations and limits](file-operations.md) and the [roadmap](roadmap.md).
+
+## 0.5.0 additions
+
+`scripts/test-volumes.sh` creates a dedicated 128 MiB APFS image and runs three tests.
+All three passed in 0.430 seconds on the same Mac. Mount and fixture guards reject
+other paths/volume sizes before the capacity-exhaustion test.
+
+- Distinct host/image device IDs; nested Unicode folders, symlinks and modes survive
+  copy/move and their Undo operations.
+- The image's actual native Trash operation and Undo restore a synthetic file.
+- A fully allocated input larger than the volume causes an actual
+  `NSFileWriteOutOfSpaceError` or `ENOSPC`. Original source bytes and the existing
+  destination remain intact, with no incomplete staging directory left behind.
+
+These results qualify APFS disk images on the recorded OS, not physical media,
+network mounts or unplugging during I/O. The script detaches its volume and leaves
+only the ignored test image as local evidence.
+
+Undo menus now identify the operation/count and explain replacement/incomplete
+records. Session recovery, shortcut presets and current regression/packaging
+results are recorded in [P5 verification](p5-verification.md).

@@ -10,6 +10,16 @@ public struct FileConflict: Sendable {
     public let destinationIsDirectory: Bool
 }
 public enum FileOperationPhase: Sendable { case preparing, copying, moving, trashing, undoing }
+public enum FileUndoKind: Sendable { case newFolder, rename, copy, move, trash }
+public enum FileUndoBlockReason: Sendable { case replacement, incomplete }
+public struct FileUndoState: Sendable {
+    public let kind: FileUndoKind?
+    public let itemCount: Int
+    public let blockReason: FileUndoBlockReason?
+    public let isBusy: Bool
+    public static let empty = FileUndoState(kind: nil, itemCount: 0, blockReason: nil, isBusy: false)
+    public var canUndo: Bool { !isBusy && blockReason == nil && itemCount > 0 }
+}
 public struct FileOperationProgress: Sendable {
     public let current: URL
     public let completed: Int
@@ -22,6 +32,12 @@ public struct FileItemResult: Sendable {
     public let destination: URL?
     public let status: FileItemStatus
     public let error: String?
+    public let errorDomain: String?
+    public let errorCode: Int?
+    init(source: URL?, destination: URL?, status: FileItemStatus, error: String?, cause: Error? = nil) {
+        self.source = source; self.destination = destination; self.status = status; self.error = error
+        errorDomain = (cause as NSError?)?.domain; errorCode = (cause as NSError?)?.code
+    }
 }
 public struct FileBatchResult: Sendable {
     public var items: [FileItemResult] = []
@@ -54,7 +70,11 @@ public actor FileOperations {
         var current: URL { switch self { case .remove(let url, _), .restore(let url, _, _): url } }
         var expected: ItemSnapshot { switch self { case .remove(_, let value), .restore(_, _, let value): value } }
     }
-    private struct UndoBatch: Sendable { var actions: [UndoAction]; let blocked: Bool }
+    private struct UndoBatch: Sendable {
+        var actions: [UndoAction]
+        let kind: FileUndoKind
+        let blockReason: FileUndoBlockReason?
+    }
     private struct TransferResult { let url: URL; let replaced: Bool; let warning: String? }
     private let support: URL
     private let io: FileOperationIO
@@ -66,10 +86,14 @@ public actor FileOperations {
         io = FileOperationIO()
     }
     init(supportDirectory: URL, io: FileOperationIO) { support = supportDirectory; self.io = io }
-    public var canUndo: Bool { !busy && history.last.map { !$0.blocked && !$0.actions.isEmpty } == true }
+    public var undoState: FileUndoState {
+        FileUndoState(kind: history.last?.kind, itemCount: history.last?.actions.count ?? 0,
+                      blockReason: history.last?.blockReason, isBusy: busy)
+    }
+    public var canUndo: Bool { undoState.canUndo }
 
     public func retainedOperations() throws -> [FileOperationRecovery] {
-        let lease = try lease(); defer { busy = false; withExtendedLifetime(lease) {} }
+        let lease = try lease(); defer { lease.release(); busy = false }
         return try MutationJournal.retained(in: support)
     }
 
@@ -80,14 +104,14 @@ public actor FileOperations {
         busy = true
         return lease
     }
-    private func remember(_ actions: [UndoAction], blocked: Bool = false) {
-        guard !actions.isEmpty || blocked else { return }
-        history.append(UndoBatch(actions: actions, blocked: blocked))
+    private func remember(_ actions: [UndoAction], kind: FileUndoKind, blockedBy reason: FileUndoBlockReason? = nil) {
+        guard !actions.isEmpty || reason != nil else { return }
+        history.append(UndoBatch(actions: actions, kind: kind, blockReason: reason))
         if history.count > 20 { history.removeFirst() }
     }
 
     public func createFolder(named name: String, in input: URL) throws -> URL {
-        let lease = try lease(); defer { busy = false; withExtendedLifetime(lease) {} }
+        let lease = try lease(); defer { lease.release(); busy = false }
         try MutationPaths.validateName(name)
         let parent = try MutationPaths.directory(input)
         let destination = parent.appendingPathComponent(name, isDirectory: true)
@@ -97,12 +121,12 @@ public actor FileOperations {
             if errno == EEXIST { throw FileOperationError.conflict }
             throw posixError()
         }
-        remember([.remove(destination, try ItemSnapshot.capture(destination, cancellable: false))])
+        remember([.remove(destination, try ItemSnapshot.capture(destination, cancellable: false))], kind: .newFolder)
         return destination
     }
 
     public func rename(_ input: URL, to name: String) throws -> URL {
-        let lease = try lease(); defer { busy = false; withExtendedLifetime(lease) {} }
+        let lease = try lease(); defer { lease.release(); busy = false }
         try MutationPaths.validateName(name)
         let source = try MutationPaths.item(input)
         let destination = source.deletingLastPathComponent().appendingPathComponent(name)
@@ -114,7 +138,7 @@ public actor FileOperations {
             // Case-only rename on a case-insensitive volume; do not treat unrelated hard links as this case.
             guard Darwin.rename(source.path, destination.path) == 0 else { throw posixError() }
         } else { try MutationPaths.renameExclusively(source, to: destination) }
-        remember([.restore(destination, source, try ItemSnapshot.capture(destination, cancellable: false))])
+        remember([.restore(destination, source, try ItemSnapshot.capture(destination, cancellable: false))], kind: .rename)
         return destination
     }
 
@@ -122,11 +146,11 @@ public actor FileOperations {
                          resolve: @escaping ConflictResolver, progress: @escaping ProgressHandler = { _ in },
                          beforeMove: (@Sendable (URL) async throws -> Void)? = nil,
                          afterMove: (@Sendable (URL, URL) async throws -> Void)? = nil) async throws -> FileBatchResult {
-        let lease = try lease(); defer { busy = false; withExtendedLifetime(lease) {} }
+        let lease = try lease(); defer { lease.release(); busy = false }
         let directory = try MutationPaths.directory(inputDirectory)
         let sources = try normalizedSelection(inputs)
         var batch = FileBatchResult(), actions: [UndoAction] = []
-        var blockUndo = false
+        var blockUndo: FileUndoBlockReason?
         for (index, source) in sources.enumerated() {
             if Task.isCancelled { batch.cancelled = true; break }
             do {
@@ -163,19 +187,20 @@ public actor FileOperations {
                         warning = L10n.format(.fileCommittedWarning, result.url.path, error.localizedDescription)
                     }
                 }
-                blockUndo = blockUndo || result.replaced || warning != nil
+                if result.replaced { blockUndo = .replacement }
+                else if warning != nil, blockUndo == nil { blockUndo = .incomplete }
                 batch.items.append(.init(source: source, destination: result.url,
                                          status: warning == nil ? .completed : .copyRetained, error: warning))
             } catch is CancellationError { batch.cancelled = true; break }
-            catch { batch.items.append(.init(source: source, destination: nil, status: .failed, error: error.localizedDescription)) }
+            catch { batch.items.append(.init(source: source, destination: nil, status: .failed, error: error.localizedDescription, cause: error)) }
         }
         batch.unstarted = sources.count - batch.items.count
-        remember(actions, blocked: blockUndo)
+        remember(actions, kind: kind == .copy ? .copy : .move, blockedBy: blockUndo)
         return batch
     }
 
     public func trash(_ inputs: [URL], progress: @escaping ProgressHandler = { _ in }) async throws -> FileBatchResult {
-        let lease = try lease(); defer { busy = false; withExtendedLifetime(lease) {} }
+        let lease = try lease(); defer { lease.release(); busy = false }
         let sources = try normalizedSelection(inputs)
         var batch = FileBatchResult(), actions: [UndoAction] = []
         for (index, source) in sources.enumerated() {
@@ -194,16 +219,16 @@ public actor FileOperations {
                                              error: L10n.format(.trashedWithoutUndo, trashed.path, error.localizedDescription)))
                 }
             } catch is CancellationError { batch.cancelled = true; break }
-            catch { batch.items.append(.init(source: source, destination: nil, status: .failed, error: error.localizedDescription)) }
+            catch { batch.items.append(.init(source: source, destination: nil, status: .failed, error: error.localizedDescription, cause: error)) }
         }
         batch.unstarted = sources.count - batch.items.count
-        remember(actions, blocked: batch.items.contains { $0.status == .copyRetained })
+        remember(actions, kind: .trash, blockedBy: batch.items.contains { $0.status == .copyRetained } ? .incomplete : nil)
         return batch
     }
 
     public func undo(progress: @escaping ProgressHandler = { _ in }) async throws -> FileBatchResult {
-        let lease = try lease(); defer { busy = false; withExtendedLifetime(lease) {} }
-        guard let batch = history.last, !batch.blocked, !batch.actions.isEmpty else { throw FileOperationError.noUndo }
+        let lease = try lease(); defer { lease.release(); busy = false }
+        guard let batch = history.last, batch.blockReason == nil, !batch.actions.isEmpty else { throw FileOperationError.noUndo }
         // Preflight the whole group before undoing anything.
         for action in batch.actions {
             guard try ItemSnapshot.capture(action.current).matchesForUndo(action.expected) else { throw FileOperationError.undoChanged }

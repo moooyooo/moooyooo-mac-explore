@@ -17,9 +17,10 @@ func relocatedApplicationsUseBundledEnglishAndJapaneseResources() async throws {
     let directory = root.appendingPathComponent("資料")
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     for (language, fileMenu) in [("en", "File"), ("ja", "ファイル")] {
+        let preset = language == "en" ? "mac" : "explorer"
         let report = root.appendingPathComponent(language + ".json")
         let app = try await InstanceLauncher.launch(applicationURL: relocated, arguments: [
-            "--language", language, "--folder", directory.path,
+            "--language", language, "--shortcuts", preset, "--folder", directory.path,
             "--support-directory", root.appendingPathComponent("support").path,
             "--diagnostics-file", report.path,
         ], activates: false)
@@ -30,6 +31,7 @@ func relocatedApplicationsUseBundledEnglishAndJapaneseResources() async throws {
         }
         let data = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: report)) as? [String: Any])
         #expect(data["language"] as? String == language)
+        #expect(data["shortcutPreset"] as? String == preset)
         #expect((data["preferredLocalizations"] as? [String])?.first == language)
         #expect(data["localizationBundled"] as? Bool == true)
         #expect((data["menuTitles"] as? [String])?.contains(fileMenu) == true)

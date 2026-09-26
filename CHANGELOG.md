@@ -1,6 +1,21 @@
 # Changelog
 
-## 0.4.0 — in development (not published)
+## 0.5.0 — in development (not published)
+
+- Recover selections, viewport anchors and navigation history in private session
+  records; retain selection/position when navigating back and forward.
+- Add Explorer/Mac keyboard presets, process overrides and VoiceOver modifier pass-through.
+- Show Undo operation/count and explain unavailable replacement or incomplete groups.
+- Keep file actions disabled until a newly loaded directory's projection is ready.
+- Tie watcher registration to its own cancellable task and release operation/Cut
+  leases explicitly, including when process launches overlap filesystem work.
+- Add real APFS-volume copy/move/Trash/Undo and actual disk-full preservation tests.
+- Add reproducible Release measurements for native listing/startup, memory, idle CPU
+  and 50 pane lifecycle cycles; record local results in P5 documentation.
+- Keep project schema version 1. Manual, Finder, physical/network-storage, minimum-OS
+  and general release qualification remain open.
+
+## 0.4.0 — 2026-09-26 (development; not published)
 
 - Add folder creation, rename, file/folder copy and move, Trash, and bounded process-local Undo.
 - Add Explorer shortcuts, selection/empty-area context menus and native file URL drag-and-drop.

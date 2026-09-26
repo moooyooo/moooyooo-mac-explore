@@ -20,9 +20,21 @@ public enum StorageError: Error, LocalizedError {
 /// A stable sidecar inode is never unlinked. Closing the descriptor, including on crash,
 /// releases the kernel lock. O_CLOEXEC prevents ownership leaking into launched processes.
 final class AdvisoryLease: @unchecked Sendable {
-    private let descriptor: Int32
+    private let mutex = NSLock()
+    private var descriptor: Int32
     private init(_ descriptor: Int32) { self.descriptor = descriptor }
-    deinit { Darwin.close(descriptor) }
+    deinit { release() }
+
+    func release() {
+        mutex.lock()
+        defer { mutex.unlock() }
+        guard descriptor >= 0 else { return }
+        // A concurrently spawned child can briefly inherit a descriptor before
+        // exec closes O_CLOEXEC files. Unlock explicitly before closing our copy.
+        _ = flock(descriptor, LOCK_UN)
+        Darwin.close(descriptor)
+        descriptor = -1
+    }
 
     static func acquire(key: String, directory: URL) throws -> AdvisoryLease? {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
@@ -179,7 +191,7 @@ public actor ProjectStore {
         return OpenProject(handleID: id, url: url, document: document, isWritable: lease != nil, readOnlyReason: reason)
     }
 
-    public func close(_ id: UUID) { projects.removeValue(forKey: id) }
+    public func close(_ id: UUID) { projects.removeValue(forKey: id)?.lease?.release() }
 
     public func save(_ document: ProjectDocument, handleID: UUID) throws -> OpenProject {
         guard var held = projects[handleID] else { throw StorageError.closed }

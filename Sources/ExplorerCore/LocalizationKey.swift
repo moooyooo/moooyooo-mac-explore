@@ -85,6 +85,13 @@ extension L10n {
         case recoverSession
         case menuEdit
         case undo
+        case undoFileAction
+        case undoReplacementUnavailable
+        case undoIncompleteUnavailable
+        case undoFileScope
+        case undoReplacementDetail
+        case undoIncompleteDetail
+        case moveAction
         case cut
         case copy
         case paste
@@ -162,6 +169,12 @@ extension L10n {
         case operationOriginalRetained
         case replacementBackupRetained
         case itemCount
+        case shortcutPreset
+        case shortcutExplorer
+        case shortcutMac
+        case shortcutAlternative
+        case shortcutsBodyMac
+        case fieldSession
         case trashedWithoutUndo
         case fileCommittedWarning
         case retainedOperationsMenu

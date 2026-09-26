@@ -10,7 +10,8 @@ final class FileOperationController: NSObject {
     private let pasteboard: NSPasteboard
     private var task: Task<Void, Never>?
     private(set) var isBusy = false
-    private(set) var canUndo = false
+    private(set) var undoState: FileUndoState = .empty
+    var canUndo: Bool { undoState.canUndo }
     var onChange: (() -> Void)?
     private var panel: NSPanel?
     private let phaseLabel = NSTextField(labelWithString: "")
@@ -29,6 +30,33 @@ final class FileOperationController: NSObject {
     static func clipboardURLs(_ pasteboard: NSPasteboard = .general) -> [URL] {
         let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
         return Array(urls.filter(ProjectDocument.isLocalFileURL).prefix(10_001))
+    }
+
+    func configureUndoMenuItem(_ item: NSMenuItem) {
+        item.title = L10n.text(.undo)
+        if isBusy { item.toolTip = L10n.text(.fileOperationWaitDetail); return }
+        switch undoState.blockReason {
+        case .replacement:
+            item.title = L10n.text(.undoReplacementUnavailable)
+            item.toolTip = L10n.text(.undoReplacementDetail)
+        case .incomplete:
+            item.title = L10n.text(.undoIncompleteUnavailable)
+            item.toolTip = L10n.text(.undoIncompleteDetail)
+        case nil:
+            if let kind = undoState.kind, undoState.canUndo {
+                let key: L10n.Key = switch kind {
+                case .newFolder: .newFolder
+                case .rename: .renameItem
+                case .copy: .copy
+                case .move: .moveAction
+                case .trash: .moveToTrash
+                }
+                item.title = L10n.format(.undoFileAction, L10n.text(key), undoState.itemCount)
+                item.toolTip = L10n.text(.undoFileScope)
+            } else {
+                item.toolTip = L10n.text(.fileUndoUnavailable) + " " + L10n.text(.undoFileScope)
+            }
+        }
     }
 
     func canPerform(_ command: AppCommand, in browser: ExplorerBrowserController?) -> Bool {
@@ -136,12 +164,19 @@ final class FileOperationController: NSObject {
                 beforeMove = { source in try await claim.beginMoving(source) }
                 afterMove = { source, destination in try await claim.finishMoving(source, destination: destination) }
             } else { beforeMove = nil; afterMove = nil }
-            let result = try await service.transfer(claim?.sources ?? inputs, to: destination, kind: kind,
-                resolve: { [weak self] conflict in
-                    guard let self else { return .cancel }
-                    return await self.resolve(conflict, in: window)
-                }, progress: progressHandler,
-                beforeMove: beforeMove, afterMove: afterMove)
+            let result: FileBatchResult
+            do {
+                result = try await service.transfer(claim?.sources ?? inputs, to: destination, kind: kind,
+                    resolve: { [weak self] conflict in
+                        guard let self else { return .cancel }
+                        return await self.resolve(conflict, in: window)
+                    }, progress: progressHandler,
+                    beforeMove: beforeMove, afterMove: afterMove)
+            } catch {
+                await claim?.close()
+                throw error
+            }
+            await claim?.close()
             browser?.selectAfterReload(result.items.compactMap(\.destination).filter {
                 $0.deletingLastPathComponent().resolvingSymlinksInPath() == destination.resolvingSymlinksInPath()
             })
@@ -168,7 +203,7 @@ final class FileOperationController: NSObject {
             }
             progressIndicator.stopAnimation(nil)
             panel?.close(); panel = nil
-            canUndo = await service.canUndo
+            undoState = await service.undoState
             isBusy = false
             task = nil
             onChange?()

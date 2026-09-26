@@ -6,9 +6,10 @@ A lightweight native macOS file manager with Windows Explorer-inspired controls.
 Arrange multiple Explorer panes inside an MDI window, keep several workspaces open,
 launch independent app processes, and save each workspace as a project.
 
-**0.4.0 development preview.** Browsing, projects and basic file operations are implemented.
-File operations have synthetic-data and AppKit action tests; manual/Finder and physical
-cross-volume qualification remain open. See [file operations and limits](docs/file-operations.md).
+**0.5.0 development preview.** Browsing, projects, session recovery and basic file operations are implemented.
+File operations have synthetic-data, native AppKit and separate APFS volume tests;
+manual/Finder and physical removable/network-drive qualification remain open.
+See [file operations and limits](docs/file-operations.md).
 There is no signed, notarized public release yet.
 
 ## Screenshot
@@ -28,8 +29,9 @@ Actual AppKit window content with synthetic files, captured in English and Japan
   filename filtering, hidden items, favorites and automatic refresh.
 - `.mexplore` projects preserve folders, pane arrangement, columns, filters and tree settings.
 - Project editing locks, detection of outside changes, atomic saves and recovery
-  of interrupted workspace configurations.
+  of interrupted workspaces, including selection, viewport and navigation history.
 - English and Japanese menus, status messages, dialogs and accessibility labels.
+- Explorer and Mac keyboard presets, selectable from the app menu.
 - Create folders, rename, copy/cut/paste, move to Trash, resolve conflicts and undo
   supported operations. Native file URL drag-and-drop is connected.
 
@@ -91,6 +93,16 @@ open -n "build/Moooyooo Mac Explore.app" --args --language en --folder "$PWD"
 
 See [localization](docs/localization.md) for override precedence and translation work.
 
+### Keyboard controls
+
+Choose **Moooyooo Mac Explore → Keyboard Controls → Explorer / Mac**.
+Explorer is the default and accepts Control and Command shortcuts. Mac uses
+Command shortcuts and leaves native Control text editing available; Control+Tab
+still cycles panes in both presets. The change takes effect immediately in this
+process. Other instances read the saved choice when activated.
+`--shortcuts mac` or `--shortcuts explorer` overrides it for one process.
+With VoiceOver running, its Control+Option and Caps Lock combinations are passed through.
+
 ### Projects and multiple processes
 
 Use **Project → Open Project**, **Save Project** and **Save As**.
@@ -129,19 +141,26 @@ Tests cover layout and focus routing, Unicode names, project validation, save fa
 injection, real process locks and crash recovery, shared watcher cleanup, AppKit state
 restoration and both languages in a relocated packaged app.
 
+Recovery includes each pane's selection, viewport and back/forward history in
+private session files. Shared project schema version 1 is unchanged.
 Manual mouse/keyboard, IME, VoiceOver, display scaling and native panel checks remain
-open. Recovery restores workspace configurations; selections, scroll positions and
-navigation history are not yet restored. Minimum-OS and Intel verification, full UI
-performance measurements, Developer ID signing, notarization and first-download
-testing remain release gates. See the [P6 status](docs/p6-verification.md).
+open. Minimum-OS and Intel verification, Developer ID signing, notarization and
+first-download testing remain release gates. See [performance qualification](docs/p5-verification.md)
+and the [P6 status](docs/p6-verification.md).
 
 For performance experiments using generated files:
 
 ```sh
 python3 scripts/create-fixture.py .local/fixtures/10000 --count 10000
 swift run -c release BrowserBenchmark .local/fixtures/10000 10
+scripts/benchmark-ui.sh
+scripts/test-volumes.sh
 ```
 
+`benchmark-ui.sh` builds Release and measures native table display, startup, memory,
+60-second idle CPU and 50 pane open/close cycles. Reports are kept under ignored
+`.local/`. `test-volumes.sh` creates its own 128 MiB APFS image to test cross-volume
+operations and real disk-full failures, then detaches it.
 `StorageProbe` and `BrowserBenchmark` are not bundled in the app.
 `--support-directory` isolates test recovery, locks and recent-project records;
 processes editing the same project must use the same support directory.
@@ -150,7 +169,7 @@ processes editing the same project must use the same support directory.
 
 - [Contributing](CONTRIBUTING.md), [security reporting](SECURITY.md)
 - [Release preparation and packaging](docs/releasing.md)
-- [0.3.0 development release notes](docs/releases/0.3.0.md)
+- [0.5.0 development release notes](docs/releases/0.5.0.md)
 - [Requirements](docs/requirements.md), [UX](docs/ux.md), [architecture](docs/architecture.md),
   [project format](docs/projects.md) (detailed design documents currently in Japanese)
 - [Asset and dependency provenance](THIRD_PARTY_NOTICES.md)

@@ -1,5 +1,6 @@
 import AppKit
 import ExplorerCore
+import ExplorerPlatform
 
 @MainActor
 final class WorkspaceWindow: NSWindow {
@@ -83,6 +84,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     private var chrome: [UUID: PaneChrome] = [:]
     var onClose: (() -> Void)?
     var onDirectoryLoaded: (() -> Void)?
+    var onSessionChange: (() -> Void)?
     var project: WorkspaceProjectController?
     private var suppressChanges = false
     private var closeApproved = false
@@ -184,6 +186,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
             if old != url { self.changed() }
         }
         browser.onSettingsChange = { [weak self] in self?.changed() }
+        browser.onSessionChange = { [weak self] in self?.onSessionChange?() }
         browser.onOpenInNewPane = { [weak self] url in self?.addPane(directory: url) }
         let pane = PaneChrome(id: id, browser: browser,
                               minimize: { [weak self] in self?.minimize(id) },
@@ -309,7 +312,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func handleGeometryKey(_ event: NSEvent) -> Bool {
-        guard let mode = geometryMode else { return false }
+        guard let mode = geometryMode, event.modifierFlags.intersection([.command, .control, .option]).isEmpty else { return false }
         if event.keyCode == 53 {
             state.setFrame(mode.original, for: mode.id, canvas: canvasSize)
             finishGeometry()
@@ -399,6 +402,8 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
 
     func stopLoading() { browsers.values.forEach { $0.stop() } }
 
+    var readyPaneItemCounts: [Int] { state.panes.compactMap { browsers[$0.id]?.readyItemCount } }
+
     func reloadBrowsers() { browsers.values.forEach { $0.reload() } }
 
     private func changed() { if !suppressChanges { project?.changed() } }
@@ -410,6 +415,16 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         }
         if let f = window?.frame { document.windowFrame = PaneFrame(x: f.minX, y: f.minY, width: f.width, height: f.height) }
         return document
+    }
+
+    var browserSessions: [RecoveryPane] {
+        state.panes.compactMap { pane in browsers[pane.id].map { RecoveryPane(id: pane.id, state: $0.savedSession) } }
+    }
+
+    func restoreBrowserSessions(_ sessions: [RecoveryPane]) throws {
+        // Validate all before applying any, including IDs and current folder consistency.
+        try RecoveryWorkspace(document: snapshot(name: "Recovery"), sourceURL: nil, browserStates: sessions).validate()
+        for session in sessions { try browsers[session.id]?.restoreSession(session.state) }
     }
 
     func restore(_ document: ProjectDocument) throws {

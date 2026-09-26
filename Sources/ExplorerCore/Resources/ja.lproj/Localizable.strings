@@ -83,6 +83,13 @@
 "recoverSession" = "終了していないセッションを復旧…";
 "menuEdit" = "編集";
 "undo" = "元に戻す";
+"undoFileAction" = "%@を元に戻す（%ld項目）";
+"undoReplacementUnavailable" = "置き換えは元に戻せません";
+"undoIncompleteUnavailable" = "一部完了した操作は元に戻せません";
+"undoFileScope" = "このプロセスで行った最大20組の操作を、終了するまで元に戻せます。実行前に、ファイルが外部で変更されていないか確認します。";
+"undoReplacementDetail" = "直前の操作は既存項目を置き換えました。ここでは元に戻せません。以前の項目はゴミ箱、後処理に失敗した場合は「中断したファイル操作」で確認してください。";
+"undoIncompleteDetail" = "直前の操作はファイルを保持しましたが、元に戻すための情報をすべて記録できませんでした。操作結果と保持されたファイルを確認してください。";
+"moveAction" = "移動";
 "cut" = "切り取り";
 "copy" = "コピー";
 "paste" = "貼り付け";
@@ -207,3 +214,9 @@
 "revealRetainedOperations" = "保持したデータをFinderで表示";
 "fileCommittedWarning" = "保存先 %@ への確定は完了しましたが、確認または移動記録の更新に失敗しました。再実行する前に内容を確認してください。%@";
 "trashedWithoutUndo" = "項目はゴミ箱 %@ へ移動しましたが、Undoを登録できませんでした。必要に応じてFinderから復元してください。%@";
+"fieldSession" = "Explorerの復旧情報";
+"shortcutPreset" = "キー操作";
+"shortcutExplorer" = "Explorer（ControlとCommand）";
+"shortcutMac" = "Mac（Command）";
+"shortcutAlternative" = "%@ でも操作できます";
+"shortcutsBodyMac" = "Explorer追加: Cmd+N\n親ウィンドウ追加: Cmd+Option+N\n子／親を閉じる: Cmd+W / Cmd+Shift+W\n次／前の子: Control+Tab / Control+Shift+Tab\nパス入力／名前検索: Cmd+L / Cmd+F\n戻る／進む: Cmd+[ / Cmd+]\n上の階層: Cmd+↑\n更新: Cmd+R / F5\n新しいフォルダ: Cmd+Shift+N\n名前の変更: F2\nコピー／切り取り／貼り付け: Cmd+C / Cmd+X / Cmd+V\n元に戻す: Cmd+Z\nゴミ箱へ移動: Cmd+⌫\nプロジェクトを開く／保存: Cmd+O / Cmd+S\n別名保存: Cmd+Shift+S\nコンテキストメニュー: Shift+F10\n子の移動・サイズ変更: ウィンドウメニュー\n\nControl系の文字編集・OS操作が使えます。VoiceOverの修飾キーはVoiceOverへ渡します。";

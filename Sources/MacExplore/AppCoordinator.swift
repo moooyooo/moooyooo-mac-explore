@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import ExplorerCore
 import ExplorerPlatform
 
@@ -33,6 +34,8 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     private var recoveryErrorShown = false
     private var instanceArguments: [String] = []
     private var fileOperations = FileOperationController()
+    private var shortcutPreset = ShortcutSettings.argument() ?? ShortcutSettings.preference()
+    private var usesShortcutOverride = ShortcutSettings.argument() != nil
 
     init(startTime: TimeInterval) { self.startTime = startTime }
 
@@ -72,6 +75,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         }
         fileOperations.onChange = { [weak self] in self?.windows.forEach { $0.reloadBrowsers() } }
         if let language = LanguageSettings.argument() { instanceArguments += ["--language", language.rawValue] }
+        if let shortcuts = ShortcutSettings.argument() { instanceArguments += ["--shortcuts", shortcuts.rawValue] }
         let session = SessionStore(instanceID: instanceID, supportDirectory: supportDirectory)
         sessionStore = session
         Task {
@@ -128,6 +132,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
             self?.scheduleRecovery()
         }
         controller.onDirectoryLoaded = { [weak self] in self?.directoryLoaded() }
+        controller.onSessionChange = { [weak self] in self?.scheduleRecovery() }
         windows.append(controller)
         controller.showWindow(nil)
         controller.window?.makeKeyAndOrderFront(nil)
@@ -147,7 +152,10 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         for controller in windows { controller.stopLoading() }
     }
 
-    func applicationDidBecomeActive(_ notification: Notification) { windows.forEach { $0.reloadBrowsers() } }
+    func applicationDidBecomeActive(_ notification: Notification) {
+        if !usesShortcutOverride { shortcutPreset = ShortcutSettings.preference(); updateShortcutHints() }
+        windows.forEach { $0.reloadBrowsers() }
+    }
 
     func application(_ sender: NSApplication, open urls: [URL]) {
         if !launched { pendingProjectURLs += urls; return }
@@ -245,6 +253,10 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(changeShortcutPreset(_:)) {
+            menuItem.state = (menuItem.representedObject as? String) == shortcutPreset.rawValue ? .on : .off
+            return !terminating
+        }
         if menuItem.action == #selector(changeLanguage(_:)) {
             menuItem.state = (menuItem.representedObject as? String) == LanguageSettings.preference().rawValue ? .on : .off
             return !terminating
@@ -252,8 +264,13 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         if (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true { return false }
         guard let command = AppCommand(rawValue: menuItem.tag) else { return true }
         if textSelector(for: command) != nil, let editor = NSApp.keyWindow?.firstResponder as? NSTextView, editor.isEditable {
+            if command == .undoFiles {
+                menuItem.title = editor.undoManager?.undoMenuItemTitle ?? L10n.text(.undo)
+                menuItem.toolTip = nil
+            }
             return command != .undoFiles || editor.undoManager?.canUndo == true
         }
+        if command == .undoFiles { fileOperations.configureUndoMenuItem(menuItem) }
         switch command {
         case .recoverFileOperations: return !terminating && !fileOperations.isBusy
         case .newFolder, .renameItem, .trashFiles, .copyFiles, .cutFiles, .pasteFiles, .undoFiles, .copyPath:
@@ -283,6 +300,8 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         guard let window = NSApp.keyWindow, window is WorkspaceWindow, window.attachedSheet == nil else { return false }
         let editor = window.firstResponder as? NSTextView
         if editor?.hasMarkedText() == true { return false }
+        if NSWorkspace.shared.isVoiceOverEnabled,
+           event.modifierFlags.contains([.control, .option]) || event.modifierFlags.contains(.capsLock) { return false }
         if current?.handleGeometryKey(event) == true { return true }
         var flags: KeyModifiers = []
         if event.modifierFlags.contains(.command) { flags.insert(.command) }
@@ -291,7 +310,8 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         if event.modifierFlags.contains(.shift) { flags.insert(.shift) }
         guard let action = Shortcuts.resolve(
             key: event.charactersIgnoringModifiers ?? "", code: event.keyCode, modifiers: flags,
-            editingText: editor?.isEditable == true, composingText: editor?.hasMarkedText() == true
+            editingText: editor?.isEditable == true, composingText: editor?.hasMarkedText() == true,
+            preset: shortcutPreset, voiceOverEnabled: NSWorkspace.shared.isVoiceOverEnabled
         ) else { return false }
         switch action {
         case .command(let command): perform(command)
@@ -331,6 +351,15 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         }
         languageItem.submenu = languageMenu
         app.addItem(languageItem)
+        let shortcutItem = NSMenuItem(title: L10n.text(.shortcutPreset), action: nil, keyEquivalent: "")
+        let shortcutMenu = NSMenu(title: shortcutItem.title)
+        for (preset, key): (ShortcutPreset, L10n.Key) in [(.explorer, .shortcutExplorer), (.mac, .shortcutMac)] {
+            let item = NSMenuItem(title: L10n.text(key), action: #selector(changeShortcutPreset(_:)), keyEquivalent: "")
+            item.target = self; item.representedObject = preset.rawValue
+            shortcutMenu.addItem(item)
+        }
+        shortcutItem.submenu = shortcutMenu
+        app.addItem(shortcutItem)
         app.addItem(.separator())
         app.addItem(withTitle: L10n.text(.hideApp), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         app.addItem(.separator())
@@ -401,6 +430,34 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         add(help, L10n.text(.shortcutList), .shortcuts)
         add(help, L10n.text(.diagnostics), .diagnostics)
         NSApp.helpMenu = help
+        updateShortcutHints()
+    }
+
+    @objc private func changeShortcutPreset(_ sender: NSMenuItem) {
+        guard let value = sender.representedObject as? String, let preset = ShortcutPreset(rawValue: value) else { return }
+        shortcutPreset = preset
+        usesShortcutOverride = false
+        UserDefaults.standard.set(preset.rawValue, forKey: ShortcutSettings.preferenceKey)
+        if let index = instanceArguments.firstIndex(of: "--shortcuts") { instanceArguments.removeSubrange(index...index + 1) }
+        updateShortcutHints()
+    }
+
+    private func updateShortcutHints() {
+        func visit(_ menu: NSMenu) {
+            for item in menu.items {
+                if let submenu = item.submenu { visit(submenu) }
+                guard item.action == #selector(menuCommand(_:)), let command = AppCommand(rawValue: item.tag) else { continue }
+                if shortcutPreset == .explorer, Shortcuts.hasControlAlternative(command), !item.keyEquivalent.isEmpty,
+                   !(NSWorkspace.shared.isVoiceOverEnabled && item.keyEquivalentModifierMask.contains(.option)) {
+                    var keys = ["Control"]
+                    if item.keyEquivalentModifierMask.contains(.option) { keys.append("Option") }
+                    if item.keyEquivalentModifierMask.contains(.shift) { keys.append("Shift") }
+                    keys.append(item.keyEquivalent.uppercased())
+                    item.toolTip = L10n.format(.shortcutAlternative, keys.joined(separator: "+"))
+                } else { item.toolTip = nil }
+            }
+        }
+        if let menu = NSApp.mainMenu { visit(menu) }
     }
 
     @objc private func changeLanguage(_ sender: NSMenuItem) {
@@ -417,7 +474,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     private func showShortcuts() {
         let alert = NSAlert()
         alert.messageText = L10n.text(.shortcutsTitle)
-        alert.informativeText = L10n.text(.shortcutsBody)
+        alert.informativeText = L10n.text(shortcutPreset == .explorer ? .shortcutsBody : .shortcutsBodyMac)
         alert.runModal()
     }
 
@@ -436,8 +493,13 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
             "localizationBundled": Localizer.resourceBundle.bundleURL.resolvingSymlinksInPath().standardizedFileURL
                 == Bundle.main.resourceURL?.appendingPathComponent("MacExplore_ExplorerCore.bundle").resolvingSymlinksInPath().standardizedFileURL,
             "menuTitles": NSApp.mainMenu?.items.map(\.title) ?? [],
+            "shortcutPreset": shortcutPreset.rawValue,
+            "readyPaneItemCounts": windows.flatMap(\.readyPaneItemCounts),
         ]
-        if let firstDirectoryTime { data["firstDirectorySecondsFromMain"] = firstDirectoryTime }
+        if let firstDirectoryTime {
+            data["firstDirectorySecondsFromMain"] = firstDirectoryTime
+            data["firstDirectoryReadySystemUptime"] = startTime + firstDirectoryTime
+        }
         return data
     }
 
@@ -453,7 +515,17 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     }
 
     private func directoryLoaded() {
-        if firstDirectoryTime == nil { firstDirectoryTime = ProcessInfo.processInfo.systemUptime - startTime }
+        if firstDirectoryTime == nil {
+            // Include native row layout and drawing submission in opt-in startup measurements.
+            if reportURL != nil {
+                for controller in windows {
+                    controller.window?.contentView?.layoutSubtreeIfNeeded()
+                    controller.window?.displayIfNeeded()
+                }
+                CATransaction.flush()
+            }
+            firstDirectoryTime = ProcessInfo.processInfo.systemUptime - startTime
+        }
         guard let reportURL, !reportScheduled else { return }
         reportScheduled = true
         Task { [weak self] in
@@ -548,7 +620,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     private func recoverySnapshot() -> [RecoveryWorkspace] {
         windows.compactMap { controller in
             guard let project = controller.project else { return nil }
-            return RecoveryWorkspace(document: project.snapshot(), sourceURL: project.url)
+            return RecoveryWorkspace(document: project.snapshot(), sourceURL: project.url, browserStates: controller.browserSessions)
         }
     }
 
@@ -590,6 +662,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
                 for workspace in session.workspaces {
                     let controller = createWindow(directories: [])
                     try controller.project?.recover(workspace.document)
+                    try controller.restoreBrowserSessions(workspace.browserStates ?? [])
                 }
                 // Durable handoff before removing the original crashed instance's data.
                 try await sessionStore.update(recoverySnapshot())

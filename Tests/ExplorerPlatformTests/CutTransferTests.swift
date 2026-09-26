@@ -17,6 +17,8 @@ import Testing
         let second = try await store.acquire(fresh, clipboardURLs: [source])
         try await second.beginMoving(second.sources[0])
         // No finish: simulate a failure after the durable claim. The original stays intact.
+        await second.close()
+        await #expect(throws: CutTransferError.self) { try await second.beginMoving(second.sources[0]) }
     }
     await #expect(throws: CutTransferError.self) { try await store.acquire(fresh, clipboardURLs: [source]) }
     #expect(FileManager.default.fileExists(atPath: source.path))

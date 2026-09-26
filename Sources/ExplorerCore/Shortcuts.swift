@@ -10,6 +10,8 @@ public enum AppCommand: Int, Sendable {
     case recoverFileOperations
 }
 
+import Foundation
+
 public struct KeyModifiers: OptionSet, Sendable {
     public let rawValue: Int
     public init(rawValue: Int) { self.rawValue = rawValue }
@@ -27,9 +29,25 @@ public enum ShortcutAction: Equatable, Sendable {
 }
 
 public enum Shortcuts {
+    public static func hasControlAlternative(_ command: AppCommand) -> Bool {
+        switch command {
+        case .newPane, .newWindow, .closePane, .closeWindow, .focusAddress, .refresh, .focusSearch,
+             .saveProject, .saveProjectAs, .openProject, .openFolder, .newFolder,
+             .copyFiles, .cutFiles, .pasteFiles, .undoFiles, .selectAll: true
+        default: false
+        }
+    }
+
     public static func resolve(key: String, code: UInt16, modifiers flags: KeyModifiers,
-                               editingText: Bool, composingText: Bool) -> ShortcutAction? {
+                               editingText: Bool, composingText: Bool, preset: ShortcutPreset = .explorer,
+                               voiceOverEnabled: Bool = false) -> ShortcutAction? {
         guard !composingText else { return nil }
+        if voiceOverEnabled, flags.contains([.control, .option]) { return nil }
+        if preset == .mac, flags.contains(.control) {
+            // Pane cycling remains available in both presets; text Control bindings
+            // and other macOS Control shortcuts pass through unchanged.
+            guard code == 48, flags == .control || flags == [.control, .shift] else { return nil }
+        }
         let key = key.lowercased()
         if flags == .command || flags == .control {
             let commands: [String: AppCommand] = ["n": .newPane, "w": .closePane, "l": .focusAddress, "r": .refresh, "f": .focusSearch, "s": .saveProject, "o": .openProject]
@@ -75,5 +93,17 @@ public enum Shortcuts {
             if !editingText, code == 109 { return .command(.contextMenu) }
         }
         return nil
+    }
+}
+public enum ShortcutPreset: String, CaseIterable, Sendable { case explorer, mac }
+
+public enum ShortcutSettings {
+    public static let preferenceKey = "ShortcutPreset"
+    public static func preference(in defaults: UserDefaults = .standard) -> ShortcutPreset {
+        ShortcutPreset(rawValue: defaults.string(forKey: preferenceKey) ?? "") ?? .explorer
+    }
+    public static func argument(in arguments: [String] = CommandLine.arguments) -> ShortcutPreset? {
+        guard let index = arguments.lastIndex(of: "--shortcuts"), arguments.indices.contains(index + 1) else { return nil }
+        return ShortcutPreset(rawValue: arguments[index + 1])
     }
 }

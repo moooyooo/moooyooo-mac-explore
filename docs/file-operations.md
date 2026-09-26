@@ -1,7 +1,7 @@
 # File operations / ファイル操作
 
-0.4.0 development preview. Manual mouse/keyboard, Finder interoperability and
-physical cross-volume qualification are still pending. Use synthetic data for evaluation.
+0.5.0 development preview. Manual mouse/keyboard, Finder interoperability and
+physical removable/network-drive qualification are still pending. Use synthetic data for evaluation.
 
 ## 操作
 
@@ -33,6 +33,7 @@ Explorer内の一覧またはツリーで項目を選び、ファイル／編集
   contents, identities and access policy before changing anything. Replacement,
   restart and another process's operations are outside Undo's scope. External edits
   and collisions stop Undo; Undo never permanently deletes items.
+  The menu shows the operation and item count, or why Undo is unavailable.
 - File URL dragging is connected: same-volume defaults to Move, otherwise Copy.
   Option requests Copy; Shift requests Move. Invalid descendants and same-folder
   moves are rejected. Drag validation runs away from the UI thread.
@@ -66,7 +67,12 @@ copy/cut/paste across panes, followed by move Undo.
 The native Trash confirmation and Undo also run on a synthetic file through macOS's
 actual Trash API. Post-move metadata settling is retried before registering Undo.
 
-Actual disk-full/disconnection, physical cross-volume moves, Finder drag sequences,
+`scripts/test-volumes.sh` also verifies distinct device IDs with an isolated 128 MiB
+APFS disk image: folder copy/move/Undo, native volume Trash/Undo and an actual
+out-of-space error. The source and an existing destination survive that failed copy.
+The image is created solely for the test and detached afterward.
+
+Disconnection, physical removable/network-drive moves, Finder drag sequences,
 large-file progress, keyboard/IME/VoiceOver and supported-OS visual checks remain.
 Folders that cannot be read completely, unsupported special files, or attributes
 larger than the bounded verification buffer are refused while retaining originals.

@@ -64,6 +64,10 @@ struct FileOperationUITests {
         try await waitUntil { !operations.isBusy && browser.selectedURLs.first?.lastPathComponent == "名前変更 済み" }
         #expect(!FileManager.default.fileExists(atPath: folder.appendingPathComponent("資料 UI 🗂").path))
         #expect(FileManager.default.fileExists(atPath: folder.appendingPathComponent("名前変更 済み").path))
+        let undo = try #require(browser.contextMenu().items.first { $0.tag == AppCommand.undoFiles.rawValue })
+        #expect(browser.validateMenuItem(undo))
+        #expect(undo.title == L10n.format(.undoFileAction, L10n.text(.renameItem), 1))
+        #expect(undo.toolTip == L10n.text(.undoFileScope))
     }
 
     @Test func contextCopyCutAndPasteTransferFoldersAcrossPanes() async throws {

@@ -39,11 +39,15 @@ private struct OperationFixture {
     let f = try OperationFixture(); defer { f.storage.cleanup() }
     let service = f.service()
     let folder = try await service.createFolder(named: "資料 🗂", in: f.destination)
+    #expect(await service.undoState.kind == .newFolder)
     let renamed = try await service.rename(folder, to: "変更 済み")
+    let renamedUndo = await service.undoState
+    #expect(renamedUndo.kind == .rename && renamedUndo.itemCount == 1)
     #expect(FileManager.default.fileExists(atPath: renamed.path))
     #expect(!FileManager.default.fileExists(atPath: folder.path))
     _ = try await service.undo()
     #expect(FileManager.default.fileExists(atPath: folder.path))
+    #expect(await service.undoState.kind == .newFolder)
     _ = try await service.undo()
     #expect(!FileManager.default.fileExists(atPath: folder.path))
     #expect(try FileManager.default.contentsOfDirectory(atPath: f.trash.path).count == 1)
@@ -83,6 +87,7 @@ private struct OperationFixture {
     let old = try #require(FileManager.default.contentsOfDirectory(at: f.trash, includingPropertiesForKeys: nil).first)
     #expect(try String(contentsOf: old, encoding: .utf8) == "old")
     #expect(await service.canUndo == false)
+    #expect(await service.undoState.blockReason == .replacement)
 }
 
 @Test func replacingFolderKeepsOldFolderWholeAndRetainsBackupIfTrashFails() async throws {

@@ -41,6 +41,8 @@ public actor CutTransferStore {
         guard let lease = try AdvisoryLease.acquire(key: "cut-" + id.uuidString, directory: support.appendingPathComponent("Locks")) else {
             throw FileOperationError.busy
         }
+        var handedOff = false
+        defer { if !handedOff { lease.release() } }
         let url = support.appendingPathComponent("FileTransfers").appendingPathComponent(id.uuidString + ".json")
         let data: Data
         let record: CutRecord
@@ -52,7 +54,9 @@ public actor CutTransferStore {
               record.created.timeIntervalSinceNow < 60, Set(record.items.map(\.url)) == urls,
               !record.items.contains(where: { $0.state == .moving }),
               record.items.contains(where: { $0.state == .ready }) else { throw CutTransferError.unavailable }
-        return CutTransferClaim(record: record, url: url, baseline: data, lease: lease)
+        let claim = CutTransferClaim(record: record, url: url, baseline: data, lease: lease)
+        handedOff = true
+        return claim
     }
 }
 
@@ -62,6 +66,7 @@ public actor CutTransferClaim {
     private let url: URL
     private var baseline: Data
     private let lease: AdvisoryLease
+    private var closed = false
 
     fileprivate init(record: CutRecord, url: URL, baseline: Data, lease: AdvisoryLease) {
         self.record = record; self.url = url; self.baseline = baseline; self.lease = lease
@@ -69,7 +74,7 @@ public actor CutTransferClaim {
     }
 
     public func beginMoving(_ source: URL) throws {
-        guard let index = record.items.firstIndex(where: { $0.url == source }), record.items[index].state == .ready else {
+        guard !closed, let index = record.items.firstIndex(where: { $0.url == source }), record.items[index].state == .ready else {
             throw CutTransferError.unavailable
         }
         guard try ItemSnapshot.capture(source) == record.items[index].snapshot else { throw CutTransferError.changed }
@@ -79,7 +84,7 @@ public actor CutTransferClaim {
     }
 
     public func finishMoving(_ source: URL, destination: URL) throws {
-        guard let index = record.items.firstIndex(where: { $0.url == source }), record.items[index].state == .moving else {
+        guard !closed, let index = record.items.firstIndex(where: { $0.url == source }), record.items[index].state == .moving else {
             throw CutTransferError.unavailable
         }
         record.items[index].state = .completed
@@ -88,6 +93,11 @@ public actor CutTransferClaim {
             record.items[child].state = .completed
         }
         try save()
+    }
+
+    public func close() {
+        closed = true
+        lease.release()
     }
 
     private func save() throws {

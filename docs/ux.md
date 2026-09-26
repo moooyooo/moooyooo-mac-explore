@@ -4,8 +4,8 @@
 Windowsのキー動作は[Microsoft公式の一覧](https://support.microsoft.com/en-us/accessibility/windows/keyboard-shortcuts-in-windows)を参照した。
 以下のMDI・プロジェクト用キーとMac上での割当は、このアプリの設計である。
 
-0.4.0開発版では閲覧・MDI・プロジェクトに加え、基本ファイル操作、コンテキスト
-メニュー、ファイルURLのDnDを接続した。キーのプリセット切替は未実装。
+0.5.0開発版では閲覧・MDI・プロジェクトに加え、基本ファイル操作、コンテキスト
+メニュー、ファイルURLのDnD、キーのプリセット切替を実装した。
 表全体は目標仕様を含み、実画面・Finderの検証も残る。
 実装済みのプロジェクト操作は[操作手順](projects.md)を参照。
 
@@ -63,6 +63,9 @@ macOSのネイティブメニューを使い、前面の親ウィンドウとア
 
 既定は「Explorer」プリセット。Control系と表のCommand系代替を受け付ける。
 MacプリセットではControl系のアプリ独自割当を解除し、Command系を中心にする。
+共通の子画面切替（Control+Tab / Control+Shift+Tab）は維持する。
+アプリ名メニューの「キー操作」から即座に切り替えられる。別プロセスは前面に戻る際に
+保存済み設定を読み込む。起動引数`--shortcuts mac|explorer`がある場合はそれを優先する。
 全操作はメニューからも使え、メニュー／ヘルプには現在のプリセットを反映する。
 
 表の`Alt`相当はMacの`Option`。`Delete→`は前方削除キー、`Backspace`は
@@ -108,8 +111,13 @@ Ctrl+Nを子の追加に、Ctrl+Tabを子の巡回に割り当てる点はMDIへ
 - Ctrl+Lなどの移動キーは未変換状態なら使える。Option+矢印は入力欄では文字移動を優先する。
 - Ctrl+クリックはmacOSのコンテキストメニュー動作を維持する。複数選択はCmd+クリック、範囲はShift+クリック。
 - Cmd+Tab、Mission Control、入力ソース切替、VoiceOverのキーをグローバルに奪わない。
+- VoiceOver起動中はControl+OptionとCaps Lock修飾をコマンド処理・子画面移動へ渡さない。
 - WindowsキーによるOS全体の起動操作やAlt文字メニューは初期版で再現しない。
 - Shift+Deleteの完全削除は未提供。通常のゴミ箱操作へ暗黙に読み替えない。
+
+ファイルのUndoメニューには対象操作と項目数を表示する。置き換えや不完全なUndo情報で
+利用できない場合は理由を表示し、ツールチップで確認先を案内する。テキスト入力中は
+その入力欄のUndoへ切り替える。
 
 ## 4. ドラッグ＆ドロップ
 

@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 @testable import ExplorerCore
 
 @Test func imeCompositionNeverRoutesToWorkspaceCommands() {
@@ -42,4 +43,31 @@ import Testing
     #expect(Shortcuts.resolve(key: "", code: 117, modifiers: .shift, editingText: false, composingText: false) == nil)
     #expect(Shortcuts.resolve(key: "", code: 117, modifiers: [], editingText: true, composingText: false) == nil)
     #expect(Shortcuts.resolve(key: "", code: 109, modifiers: .shift, editingText: false, composingText: false) == .command(.contextMenu))
+}
+
+@Test func macPresetPreservesNativeControlEditingAndKeepsCommandOperations() {
+    for key in ["a", "n", "c", "x", "v", "z", "o", "s", "f"] {
+        #expect(Shortcuts.resolve(key: key, code: 0, modifiers: .control, editingText: true, composingText: false, preset: .mac) == nil)
+        #expect(Shortcuts.resolve(key: key, code: 0, modifiers: .control, editingText: false, composingText: false, preset: .mac) == nil)
+    }
+    #expect(Shortcuts.resolve(key: "c", code: 8, modifiers: .command, editingText: false, composingText: false, preset: .mac) == .command(.copyFiles))
+    #expect(Shortcuts.resolve(key: "n", code: 45, modifiers: [.command, .shift], editingText: false, composingText: false, preset: .mac) == .command(.newFolder))
+    #expect(Shortcuts.resolve(key: "", code: 48, modifiers: .control, editingText: true, composingText: false, preset: .mac) == .command(.nextPane))
+    #expect(Shortcuts.resolve(key: "", code: 48, modifiers: [.control, .shift], editingText: true, composingText: false, preset: .mac) == .command(.previousPane))
+    #expect(Shortcuts.resolve(key: "n", code: 45, modifiers: [.control, .option], editingText: false, composingText: false, voiceOverEnabled: true) == nil)
+    #expect(Shortcuts.resolve(key: "n", code: 45, modifiers: [.command, .option], editingText: false, composingText: false, voiceOverEnabled: true) == .command(.newWindow))
+}
+
+@Test func shortcutPreferencesAndLaunchOverrideAreBounded() throws {
+    let name = "MacExplore.Shortcuts.Tests." + UUID().uuidString
+    let defaults = try #require(UserDefaults(suiteName: name))
+    defer { defaults.removePersistentDomain(forName: name) }
+    #expect(ShortcutSettings.preference(in: defaults) == .explorer)
+    defaults.set("mac", forKey: ShortcutSettings.preferenceKey)
+    #expect(ShortcutSettings.preference(in: defaults) == .mac)
+    defaults.set("unknown", forKey: ShortcutSettings.preferenceKey)
+    #expect(ShortcutSettings.preference(in: defaults) == .explorer)
+    #expect(ShortcutSettings.argument(in: ["app", "--shortcuts", "mac"]) == .mac)
+    #expect(ShortcutSettings.argument(in: ["app", "--shortcuts", "unknown"]) == nil)
+    #expect(ShortcutSettings.argument(in: ["app", "--shortcuts"]) == nil)
 }
