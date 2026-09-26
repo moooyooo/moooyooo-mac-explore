@@ -10,14 +10,17 @@ Updated 2026-09-26. The [Japanese roadmap](roadmap.md) includes detailed accepta
 | P3 | Projects, save ownership and recovery | Implemented and tested; manual confirmations and selection/scroll/history recovery remain |
 | P4 | Create, rename, copy, move, trash, drag-and-drop, Undo | Not started |
 | P5 | Performance, accessibility and OS qualification | Full qualification not started |
-| L10n | English/Japanese and language selection | Implemented before P6; native panel and visual review remain |
+| L10n | English/Japanese and language selection | Implemented; both workspace images reviewed; native panel/input checks remain |
 | P6 | Public documentation, CI and release preparation | Local preparation implemented; in progress |
 
 By request, multilingual support and P6 preparation precede P4/P5. General-release
 criteria still include P4/P5. A browsing development preview may be published earlier
 with its limitations clearly documented.
 
-Remaining: English screenshots; upstream creation and private security reports;
+Completed locally: [English/Japanese captures](screenshots.md), release notes draft,
+MIT/public documentation and verified development packaging.
+
+Remaining: upstream creation and private security reports;
 hosted CI; macOS 14, IME and VoiceOver checks; performance qualification;
 Developer ID signing, notarization and first-download verification.
 

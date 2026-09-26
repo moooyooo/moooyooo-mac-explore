@@ -9,8 +9,11 @@
 - Add translation checks and expanded macOS CI.
 - Prepare public documentation, Issue templates, security policy and synthetic demos.
 - Add verified development ZIPs, SHA-256/build metadata and a notarization path.
+- Add visually reviewed English/Japanese screenshots, a reproducible debug-only
+  AppKit capture command and draft development release notes.
+- Preserve verified CI development archives for 14 days when the workflow runs.
 - Preserve project schema version 1 and user-supplied names and paths.
-- Hosted CI, screenshots, notarization and platform/manual qualification remain pending.
+- Hosted CI, notarization and platform/manual qualification remain pending.
 
 ## 0.2.0 — 2026-09-25 (development)
 

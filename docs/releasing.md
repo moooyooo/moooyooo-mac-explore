@@ -10,14 +10,17 @@ file operations and full P5 qualification remain incomplete.
 - [x] Issue templates, security policy and dependency/asset provenance.
 - [x] Local build/tests, archive verification and development packaging.
 - [x] Synthetic sample generator and screenshot instructions.
-- [ ] Review and capture English screenshots.
+- [x] Review and capture English/Japanese window content using synthetic files.
+- [x] Draft development release notes and configure retention of verified CI artifacts.
 - [ ] Confirm upstream `moooyooo/moooyooo-mac-explore` and approve publication.
-- [ ] Review tracked files/history for private data.
+- [x] Review source/history for known private-data patterns and inspect screenshot metadata.
 - [ ] Create upstream and enable/verify private vulnerability reporting.
 - [ ] Push the reviewed branch, run CI on macOS 14/26 and record results.
 
 No remote was configured during this preparation. GitHub authentication has been
-checked as moooyooo. Repository creation and public push are separate publication actions.
+checked as moooyooo. On 2026-09-26, the proposed repository did not resolve through
+the authenticated GitHub CLI. Repository creation and public push are separate
+publication actions.
 
 ## Local verification
 
@@ -34,6 +37,11 @@ signature and accidental developer home paths. Relocated-app tests check that th
 app loads its own translations. Integration tests need a macOS GUI session.
 The CI workflow includes them but has not run on GitHub yet.
 See [GitHub's runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+
+The [English/Japanese screenshots](screenshots.md) show real AppKit window content
+using synthetic files. Their debug-only export command is excluded from release
+executables and checked by `verify-app.py`. Visual review of these images does not
+replace input, accessibility or native-dialog testing.
 
 Record Swift/OS versions and repeat a native build from a clean checkout.
 macOS 14 is a deployment target until runtime validation succeeds. Builds use the
@@ -56,6 +64,21 @@ Check an archive from its directory:
 ```sh
 shasum -a 256 -c Moooyooo-Mac-Explore-0.3.0-arm64-dev.sha256
 ```
+
+## Retrieve CI artifacts
+
+After the upstream is created and a workflow succeeds, open **Actions → macOS build
+and test → the run → Artifacts**. Each matrix job uploads
+`development-<runner OS>-<architecture>` containing the development ZIP, checksum
+and build record. The retention period is 14 days. Sign in to GitHub to download
+workflow artifacts.
+
+Extract the artifact download first, then check the inner app ZIP with its
+`.sha256` file. Compare the commit and `source_state=clean` in `.build.txt` with the
+reviewed run. The inner ZIP preserves the app bundle's executable permissions.
+Keep the build record with any retained archive. This workflow does not sign with
+Developer ID, submit to Apple, tag a release or publish a GitHub Release.
+See [GitHub's artifact download instructions](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/download-workflow-artifacts).
 
 ## Developer ID and notarization
 
@@ -91,6 +114,9 @@ and [custom workflow](https://developer.apple.com/documentation/security/customi
 Update `CFBundleShortVersionString`/`CFBundleVersion` in `Resources/Info.plist`,
 the changelog and README together. Project schema version 1 is unchanged in 0.3.0.
 UI language does not alter saved names, serialized keys or bookmark bytes.
+The [0.3.0 release notes draft](releases/0.3.0.md) lists features, known limitations
+and local build instructions; add the actual publication/CI/artifact information
+when it exists.
 
 Verify the exact clean commit before tagging `v0.3.0` (or a named prerelease).
 Release notes must include tested platforms, incomplete features, known issues,

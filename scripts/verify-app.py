@@ -31,6 +31,7 @@ for language in ("en", "ja"):
 # Avoid shipping the developer's home/build path (including SwiftPM's generated fallback).
 strings = subprocess.check_output(["strings", str(binary)])
 assert b"/Users/" not in strings and b"/home/" not in strings, "Developer path found in release executable"
+assert b"--capture-window" not in strings, "Documentation capture commands must not ship in a release executable"
 subprocess.run(["codesign", "--verify", "--strict", str(app)], check=True)
 architectures = subprocess.check_output(["lipo", "-archs", str(binary)], text=True).strip()
 print(f"App verified: {info['CFBundleShortVersionString']} ({info['CFBundleVersion']}), {architectures}, en/ja, bundled licenses.")

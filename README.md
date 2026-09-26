@@ -10,6 +10,13 @@ launch independent app processes, and save each workspace as a project.
 File copy, move, rename, trash, drag-and-drop and file-operation Undo are planned.
 There is no signed, notarized public release yet.
 
+## Screenshot
+
+![English workspace with Source and Documents Explorer panes](docs/images/workspace-en.png)
+
+Actual AppKit window content with synthetic files, captured in English and Japanese.
+[Japanese image](docs/images/workspace-ja.png) · [Capture details and reproduction](docs/screenshots.md)
+
 ## Features
 
 - Native Swift + AppKit UI, with no external runtime dependencies.
@@ -92,7 +99,6 @@ open -n "build/Moooyooo Mac Explore.app" --args --project /path/to/workspace.mex
 
 Repeat `--folder` to open several panes. `--demo` opens two windows with three panes
 each. [Generate a synthetic sample](examples/README.md) for a clean two-pane workspace.
-Screenshots will be added after English UI visual verification.
 
 ### Common shortcuts
 
@@ -139,6 +145,7 @@ processes editing the same project must use the same support directory.
 
 - [Contributing](CONTRIBUTING.md), [security reporting](SECURITY.md)
 - [Release preparation and packaging](docs/releasing.md)
+- [0.3.0 development release notes](docs/releases/0.3.0.md)
 - [Requirements](docs/requirements.md), [UX](docs/ux.md), [architecture](docs/architecture.md),
   [project format](docs/projects.md) (detailed design documents currently in Japanese)
 - [Asset and dependency provenance](THIRD_PARTY_NOTICES.md)

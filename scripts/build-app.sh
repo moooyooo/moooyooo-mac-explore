@@ -11,7 +11,7 @@ esac
 
 swift build --configuration "$configuration" --product MacExplore
 binary_dir="$(swift build --configuration "$configuration" --show-bin-path)"
-app_dir="$project_dir/build/Moooyooo Mac Explore.app"
+app_dir="${MACEXPLORE_APP_OUTPUT:-$project_dir/build/Moooyooo Mac Explore.app}"
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
 cp "$binary_dir/MacExplore" "$app_dir/Contents/MacOS/MacExplore.new"
 mv -f "$app_dir/Contents/MacOS/MacExplore.new" "$app_dir/Contents/MacOS/MacExplore"

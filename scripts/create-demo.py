@@ -4,6 +4,8 @@ import argparse
 import json
 from pathlib import Path
 import uuid
+import os
+from datetime import datetime, timezone
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("destination", type=Path, help="new directory, e.g. /tmp/MacExplore-Demo")
@@ -35,7 +37,7 @@ for index, folder in enumerate(("Source", "Documents")):
         "presentation": "normal",
         "settings": {
             "columns": [{"column": key, "width": width} for key, width in
-                        (("name", 200), ("modified", 140), ("kind", 100), ("size", 80))],
+                        (("name", 162), ("modified", 140), ("kind", 98), ("size", 80))],
             "sortColumn": "name", "ascending": True, "showHidden": False, "filter": "",
             "treeWidth": 140, "expandedDirectories": [],
             "favorites": [(root / folder).as_uri() + "/"],
@@ -43,9 +45,13 @@ for index, folder in enumerate(("Source", "Documents")):
     })
 document = {
     "schemaVersion": 1, "projectID": str(uuid.uuid4()).upper(), "revision": str(uuid.uuid4()).upper(),
-    "name": "Development", "windowFrame": {"x": 80, "y": 100, "width": 1280, "height": 800},
+    "name": "Development", "windowFrame": {"x": 80, "y": 100, "width": 1440, "height": 820},
     "panes": panes, "zOrder": [pane["id"] for pane in reversed(panes)], "activePaneID": panes[0]["id"],
 }
 project = root / "Development.mexplore"
 project.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n")
+# Stable, synthetic dates keep language comparisons and documentation repeatable.
+timestamp = datetime(2026, 9, 25, 9, 0, tzinfo=timezone.utc).timestamp()
+for path in sorted(root.rglob("*"), key=lambda value: len(value.parts), reverse=True):
+    os.utime(path, (timestamp, timestamp))
 print(project)

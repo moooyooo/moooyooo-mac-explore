@@ -1,0 +1,20 @@
+{
+  "appearance" : "aqua",
+  "language" : "en",
+  "menuTitles" : [
+    "Moooyooo Mac Explore",
+    "File",
+    "Project",
+    "Edit",
+    "View",
+    "Go",
+    "Window",
+    "Help"
+  ],
+  "paneCount" : 2,
+  "pixelHeight" : 1576,
+  "pixelWidth" : 2880,
+  "region" : "window-content",
+  "renderer" : "NSView.cacheDisplay",
+  "version" : "0.3.0"
+}

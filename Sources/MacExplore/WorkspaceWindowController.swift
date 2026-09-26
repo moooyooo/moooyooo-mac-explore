@@ -100,6 +100,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     private let number: Int
 
     var activeBrowser: ExplorerBrowserController? { state.activePaneID.flatMap { browsers[$0] } }
+    var isLoadingDirectories: Bool { browsers.values.contains { $0.loading } }
     var canvasSize: CanvasSize { CanvasSize(width: canvas.bounds.width, height: canvas.bounds.height) }
 
     init(number: Int, directories: [URL], newWindow: @escaping () -> Void, newInstance: @escaping () -> Void,

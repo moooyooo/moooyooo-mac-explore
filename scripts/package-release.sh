@@ -24,7 +24,7 @@ case "$mode" in
 esac
 
 python3 scripts/check-localizations.py
-scripts/build-app.sh release
+MACEXPLORE_APP_OUTPUT="$project_dir/build/Moooyooo Mac Explore.app" scripts/build-app.sh release
 app_dir="$project_dir/build/Moooyooo Mac Explore.app"
 python3 scripts/verify-app.py "$app_dir"
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_dir/Contents/Info.plist")"

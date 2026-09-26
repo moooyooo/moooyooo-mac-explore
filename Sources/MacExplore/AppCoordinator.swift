@@ -89,6 +89,19 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
             Task { @MainActor in self?.windows.forEach { $0.reloadBrowsers() } }
         }
         NSApp.activate(ignoringOtherApps: true)
+        #if DEBUG
+        if let index = arguments.firstIndex(of: "--capture-window"), arguments.indices.contains(index + 1) {
+            WindowCapture.start(to: URL(fileURLWithPath: arguments[index + 1]), workspace: { [weak self] in
+                guard let self, self.opening.isEmpty, self.windows.count == 1 else { return nil }
+                return self.windows.first
+            }, finish: { [weak self] in
+                guard let self else { return }
+                self.sessionTask?.cancel()
+                self.windows.forEach { $0.stopLoading(); $0.project?.release() }
+                try? await self.sessionStore?.finish()
+            })
+        }
+        #endif
     }
 
     @discardableResult

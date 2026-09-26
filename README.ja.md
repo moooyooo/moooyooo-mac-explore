@@ -24,6 +24,15 @@ Windows Explorerの操作感を基本にした、軽量なmacOSネイティブ�
 検証結果と制約は[P2/P3の実装記録](docs/p2-p3-verification.md)、
 初期の基準値は[P1の実装記録](docs/p1-verification.md)を参照してください。
 
+## 画面
+
+![日本語のワークスペース：SourceとDocumentsの2つのExplorer画面](docs/images/workspace-ja.png)
+
+合成ファイルを使った、実際のAppKitウィンドウ内容のキャプチャです。
+[英語の画面](docs/images/workspace-en.png) · [撮影条件・再生成手順](docs/screenshots.md)
+
+## プロジェクトについて
+
 2026-09-25に初期仕様を整理しました。プロジェクト名は仮称です。
 管理者・GitHubユーザー名は **[moooyooo](https://github.com/moooyooo)** です。
 GitHubへの公開は今後の工程に含みます。
@@ -136,5 +145,6 @@ swift run -c release BrowserBenchmark .local/fixtures/10000 10
 
 ライセンスは[MIT](LICENSE)です。英語README・Issueテンプレート・配布スクリプトを追加しました。
 指定により、多言語対応を先に実装してP6の公開準備を進めています。
-英語版のスクリーンショット、GitHub公開先・CI実行、Developer ID署名・公証は残作業です。
+日英の画面キャプチャと[0.3.0のリリースノート案](docs/releases/0.3.0.md)を用意しました。
+GitHub公開先・CI実行、Developer ID署名・公証は残作業です。
 検証条件は[配布手順](docs/releasing.md)と[P6の記録](docs/p6-verification.md)を参照してください。
