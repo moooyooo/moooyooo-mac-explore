@@ -1,129 +1,148 @@
 # Moooyooo Mac Explore
 
-A lightweight native macOS file manager with Windows Explorer-inspired controls,
-multiple MDI workspaces, independent app processes, and saved projects.
+[日本語](README.ja.md) · [Changelog](CHANGELOG.md) · [Roadmap](docs/roadmap.en.md)
 
-Windows Explorerの操作感を基本にした、軽量なmacOSネイティブファイラです。
-ひとつの親ウィンドウ内に複数のExplorer画面を配置し、フォルダと画面配置を
-プロジェクトとして保存・切り替えできることを目指します。
+A lightweight native macOS file manager with Windows Explorer-inspired controls.
+Arrange multiple Explorer panes inside an MDI window, keep several workspaces open,
+launch independent app processes, and save each workspace as a project.
 
-## 現在の状態
+**0.3.0 development preview.** Browsing and project persistence are implemented.
+File copy, move, rename, trash, drag-and-drop and file-operation Undo are planned.
+There is no signed, notarized public release yet.
 
-**閲覧とプロジェクト保存に対応した、バージョン0.2.0の開発版です。**
+## Features
 
-複数のMDI親ウィンドウ、子画面の移動・サイズ変更・整列・最大化・最小化、
-別プロセス起動に加え、フォルダツリー、パンくず、詳細一覧、パス入力、履歴、列ソート、
-名前フィルター、隠し項目、お気に入り、外部変更の自動更新を実装しています。
-`.mexplore`へフォルダ構成・配置・列設定を保存し、復元・切り替えができます。
-同時起動時の保存権、外部変更の検出、プロセス別の復旧も実装しています。
-コピー・移動・名前変更・ゴミ箱などのファイル操作はP4の残作業です。
-マウスでの実操作・IME・VoiceOver・最小対応OSの検証も残っています。
-
-検証結果と制約は[P2/P3の実装記録](docs/p2-p3-verification.md)、
-初期の基準値は[P1の実装記録](docs/p1-verification.md)を参照してください。
-
-2026-09-25に初期仕様を整理しました。プロジェクト名は仮称です。
-管理者・GitHubユーザー名は **[moooyooo](https://github.com/moooyooo)** です。
-GitHubへの公開は今後の工程に含みます。
-
-## 目指す使い方
-
-1. 「開発」プロジェクトで、ソース・資料・出力先を別々のExplorer画面として開く。
-2. 子画面を自由配置または整列し、プロジェクトを保存する。
-3. 別のMDI親ウィンドウで「写真整理」プロジェクトを開く。
-4. 必要に応じてアプリを**別プロセスでも起動**し、独立して作業する。
-5. 次回、保存済みプロジェクトからフォルダと配置を復元する。
+- Native Swift + AppKit UI, with no external runtime dependencies.
+- Multiple MDI windows and movable/resizable Explorer panes; tile, cascade,
+  maximize and minimize panes.
+- Independent app processes, including opening a saved project in another process.
+- Folder tree, breadcrumbs, details table, column sorting, navigation history,
+  filename filtering, hidden items, favorites and automatic refresh.
+- `.mexplore` projects preserve folders, pane arrangement, columns, filters and tree settings.
+- Project editing locks, detection of outside changes, atomic saves and recovery
+  of interrupted workspace configurations.
+- English and Japanese menus, status messages, dialogs and accessibility labels.
 
 ```mermaid
 flowchart TB
-    A["プロセス A"] --> W1["MDI親ウィンドウ：開発"]
-    A --> W2["MDI親ウィンドウ：資料整理"]
-    W1 --> E1["Explorer：ソース"]
-    W1 --> E2["Explorer：出力先"]
-    W2 --> E3["Explorer：資料"]
-    B["独立したプロセス B"] --> W3["MDI親ウィンドウ：写真整理"]
-    W3 --> E4["Explorer：取り込み元"]
-    W3 --> E5["Explorer：整理先"]
-    W1 -. "保存・復元" .-> P["開発.mexplore"]
+    A["App process A"] --> W1["MDI window: Development"]
+    A --> W2["MDI window: Documents"]
+    W1 --> E1["Explorer: Source"]
+    W1 --> E2["Explorer: Output"]
+    W2 --> E3["Explorer: Documents"]
+    B["Independent app process B"] --> W3["MDI window: Another project"]
+    W1 -. "Save / restore" .-> P["Development.mexplore"]
 ```
 
-1プロジェクトは1つのMDI親ウィンドウの構成を保存します。
-同じプロジェクトを別プロセスで開いた場合、後から開いた側はプロジェクト設定を
-読み取り専用とし、無断で保存内容を上書きしない仕様です。
+One project describes one MDI window. Opening the same project in another window
+or process makes the later instance's project layout read-only. Save a copy or
+reload and acquire editing access after the existing owner closes it.
 
-## 設計の軸
+## Requirements
 
-- Swift＋AppKitを採用。実行時の外部依存はゼロ。
-- Explorer風のメニュー、フォルダツリー、詳細一覧、アドレスバーを備える。
-- Windows系ショートカットを基本に、Command系操作も併用できるようにする。
-- MDI子画面は移動・サイズ変更・最大化・最小化・整列に対応する。
-- ファイル操作の安全性、キーボード操作、低い待機時負荷を重視する。
-- 初期対象はApple Silicon、macOS 14以降を暫定基準とする。対応保証は実機検証後に確定する。
+- macOS 14 or later is the deployment target; the minimum OS still needs validation.
+- Apple Silicon is the initial target. Intel has not been qualified.
+- Swift 6 and a macOS SDK, from Xcode or Command Line Tools.
+- Python 3 for repository validation and synthetic fixtures.
 
-## 設計資料
+Local verification uses macOS 26.5, Apple M2 Max and Swift 6.3.2 with Command Line
+Tools. CI is configured for macOS 14 and 26, but has not run on GitHub yet.
+Builds contain the host architecture, not a universal binary.
 
-| 資料 | 内容 |
-| --- | --- |
-| [要件定義](docs/requirements.md) | 必須機能、対象範囲、受け入れ条件、軽量化の目標 |
-| [UX・ショートカット](docs/ux.md) | 画面構成、メニュー、キー操作、WindowsとMacの差異 |
-| [アーキテクチャ](docs/architecture.md) | MDI、別プロセス起動、プロジェクト保存と排他制御 |
-| [開発工程](docs/roadmap.md) | 段階ごとの成果物、検証、公開までの条件 |
-| [プロジェクトの操作と形式](docs/projects.md) | 保存・切り替え・競合・復旧、JSON形式の上限 |
-| [開発への参加](CONTRIBUTING.md) | 変更・検証・公開資料の扱い |
+## Build and run
 
-## 開発環境
-
-Swift 6系とmacOS SDKが必要です。Command Line Toolsのみでもビルドできます。
+From the repository root:
 
 ```sh
-scripts/test.sh
+python3 scripts/check-localizations.py
 scripts/build-app.sh release
+scripts/test.sh --integration
+python3 scripts/verify-app.py
 open "build/Moooyooo Mac Explore.app"
 ```
 
-`build/`にローカル用のad-hoc署名を付けた`.app`を生成します。
-別プロセスでの起動は、アプリの「ファイル → 別プロセスで起動」から行えます。
-ターミナルでは次のように起動できます。
+The build script produces an ad-hoc-signed app for local development and includes
+translations and license notices. It does not contact Apple or publish anything.
+`scripts/test.sh` also works without building the app; GUI integration tests are
+then skipped. It supplies Swift Testing search paths when needed by Command Line Tools.
+
+### Language
+
+Choose **Moooyooo Mac Explore → Language / 言語 → English / 日本語 / Follow System**.
+The change applies on the next launch; open windows keep their current language.
+Initially, the app follows macOS preferred languages with English as the fallback.
+File and saved project names remain unchanged.
+
+For a separate English instance without changing the saved preference:
 
 ```sh
-open -n "build/Moooyooo Mac Explore.app" --args --folder "$PWD"
+open -n "build/Moooyooo Mac Explore.app" --args --language en --folder "$PWD"
 ```
 
-`--folder`を複数回指定すると複数の子画面を開きます。`--demo`は親2つ・各子3つを開きます。
-保存済みプロジェクトは`--project /path/to/workspace.mexplore`、またはプロジェクトメニューから開けます。
-アプリ生成後、`scripts/test.sh --integration`で実際の別プロセス起動・終了、
-同じプロジェクトの保存権、AppKitの構成復元を検証できます。テスト用アプリは自動的に終了します。
-通常のテストにも、独立したテスト用プロセスでのロック競合・強制終了試験が含まれます。
+See [localization](docs/localization.md) for override precedence and translation work.
 
-主なキー操作はCmd/Ctrl+N（子追加）、Cmd/Ctrl+Option+N（親追加）、
-Ctrl+Tab（子切替）、Cmd/Ctrl+L（パス入力）、F5（更新）です。
-Cmd/Ctrl+Oでプロジェクトを開き、Cmd/Ctrl+Sで保存、Cmd/Ctrl+Shift+Sで別名保存します。
-子の右下をドラッグするとサイズを変更できます。キーボードではウィンドウメニューの
-「子画面を移動」「サイズを変更」を選び、矢印・Enter・Escを使います。
+### Projects and multiple processes
 
-`scripts/test.sh`は、一部のCommand Line Toolsで必要なSwift Testingの検索パスを補います。
-Xcodeを選択している環境では通常のSwiftPM設定を利用します。
+Use **Project → Open Project**, **Save Project** and **Save As**.
+Use **File → Launch New Process** for an independent instance.
 
-初期確認環境はmacOS 26.5 / Apple Silicon / Swift 6.3.2 / Command Line Toolsです。
-現在選択されている開発者ディレクトリはCommand Line Toolsです。
-GitHub Actions用にmacOSでのテスト・Releaseビルドを定義しています。
-GitHubへまだpushしていないため、CI上での結果は未確認です。
+```sh
+open -n "build/Moooyooo Mac Explore.app" --args --project /path/to/workspace.mexplore
+```
 
-### Performance tools
+Repeat `--folder` to open several panes. `--demo` opens two windows with three panes
+each. [Generate a synthetic sample](examples/README.md) for a clean two-pane workspace.
+Screenshots will be added after English UI visual verification.
 
-合成データで列挙とソートの処理時間を測れます（画面描画は含みません）。
+### Common shortcuts
+
+| Action | Shortcut |
+| --- | --- |
+| New Explorer | Cmd/Ctrl+N |
+| New MDI window | Cmd/Ctrl+Option+N |
+| Close Explorer / MDI window | Cmd/Ctrl+W / Cmd/Ctrl+Shift+W |
+| Next / previous Explorer | Ctrl+Tab / Ctrl+Shift+Tab |
+| Enter path / filter names | Cmd/Ctrl+L / Cmd/Ctrl+F |
+| Back / forward / parent | Option+Left / Right / Up |
+| Refresh | F5 or Cmd+R |
+| Open / save project | Cmd/Ctrl+O / Cmd/Ctrl+S |
+| Save project as | Cmd/Ctrl+Shift+S |
+
+Use the Window menu for keyboard movement and resizing, then arrows, Enter or Esc.
+Edit-menu clipboard commands currently apply to text fields; file operations are
+not implemented. macOS menu-bar focus is Control+F2 (or Fn+Control+F2).
+
+## Verification and limitations
+
+Tests cover layout and focus routing, Unicode names, project validation, save failure
+injection, real process locks and crash recovery, shared watcher cleanup, AppKit state
+restoration and both languages in a relocated packaged app.
+
+Manual mouse/keyboard, IME, VoiceOver, display scaling and native panel checks remain
+open. Recovery restores workspace configurations; selections, scroll positions and
+navigation history are not yet restored. Minimum-OS and Intel verification, full UI
+performance measurements, Developer ID signing, notarization and first-download
+testing remain release gates. See the [P6 status](docs/p6-verification.md).
+
+For performance experiments using generated files:
 
 ```sh
 python3 scripts/create-fixture.py .local/fixtures/10000 --count 10000
 swift run -c release BrowserBenchmark .local/fixtures/10000 10
 ```
 
-`StorageProbe`と`BrowserBenchmark`は開発・検証用ツールで、配布用`.app`には入りません。
-試験用の`--support-directory`は復旧情報・ロック・最近使った一覧の保存領域を隔離します。
-通常起動では指定せず、同じプロジェクトを扱うプロセス同士では保存領域を統一してください。
+`StorageProbe` and `BrowserBenchmark` are not bundled in the app.
+`--support-directory` isolates test recovery, locks and recent-project records;
+processes editing the same project must use the same support directory.
 
-## ライセンス・公開
+## Contributing and releases
 
-ライセンスは未選定です。ソース公開前にライセンスを決定し、`LICENSE`を追加します。
-公開版では再現可能なビルド手順、テスト、英語の案内、既知の制限、配布手順を整備します。
-Windows ExplorerはUXの参照対象であり、製品の名称・画像・アイコンは独自に整備します。
+- [Contributing](CONTRIBUTING.md), [security reporting](SECURITY.md)
+- [Release preparation and packaging](docs/releasing.md)
+- [Requirements](docs/requirements.md), [UX](docs/ux.md), [architecture](docs/architecture.md),
+  [project format](docs/projects.md) (detailed design documents currently in Japanese)
+- [Asset and dependency provenance](THIRD_PARTY_NOTICES.md)
+
+Maintainer: [moooyooo](https://github.com/moooyooo). License: [MIT](LICENSE).
+The name is provisional. Windows Explorer is a UX reference; this project is not
+affiliated with Microsoft or Apple.

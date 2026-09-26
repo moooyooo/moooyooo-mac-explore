@@ -8,7 +8,7 @@ final class WorkspaceProjectController {
     static let fileType = UTType(exportedAs: "io.github.moooyooo.macexplore.project", conformingTo: .json)
     weak var workspace: WorkspaceWindowController?
     private let store: ProjectStore
-    private var metadata = ProjectDocument()
+    private var metadata = ProjectDocument(name: L10n.text(.untitled))
     private(set) var opened: OpenProject?
     private(set) var isDirty = false
     private(set) var isBusy = false
@@ -49,7 +49,8 @@ final class WorkspaceProjectController {
 
     func recover(_ document: ProjectDocument) throws {
         try workspace?.restore(document)
-        metadata = document; metadata.projectID = UUID(); metadata.name += "（復旧）"
+        metadata = document; metadata.projectID = UUID()
+        metadata.name = L10n.format(.recoveredName, document.name)
         metadata.name = String(metadata.name.prefix(255))
         opened = nil; changed()
     }
@@ -67,7 +68,7 @@ final class WorkspaceProjectController {
                 panel.canCreateDirectories = true
                 panel.nameFieldStringValue = metadata.name + ".mexplore"
                 panel.directoryURL = opened?.url.deletingLastPathComponent()
-                panel.title = isReadOnly ? "読み取り専用プロジェクトを別名保存" : "プロジェクトを保存"
+                panel.title = isReadOnly ? L10n.text(.saveReadOnly) : L10n.text(.saveProject)
                 guard await panel.beginSheetModal(for: window) == .OK, let url = panel.url else { return false }
                 destination = url
             } else { destination = nil }
@@ -86,18 +87,18 @@ final class WorkspaceProjectController {
             updateTitle(); onChange?(); onSaved?(next.url)
             if let old, old.handleID != next.handleID { await store.close(old.handleID) }
             return true
-        } catch { await show(error, title: "プロジェクトを保存できませんでした"); return false }
+        } catch { await show(error, title: L10n.text(.saveFailed)); return false }
     }
 
     func confirmDiscardingChanges() async -> Bool {
         guard !isBusy else { return false }
         guard isDirty, let window = workspace?.window else { return true }
         let alert = NSAlert()
-        alert.messageText = "プロジェクトの変更を保存しますか？"
-        alert.informativeText = "フォルダ構成と画面配置の未保存変更があります。"
-        alert.addButton(withTitle: isReadOnly ? "別名保存…" : "保存")
-        alert.addButton(withTitle: "破棄")
-        alert.addButton(withTitle: "キャンセル")
+        alert.messageText = L10n.text(.saveChangesQuestion)
+        alert.informativeText = L10n.text(.saveChangesDetail)
+        alert.addButton(withTitle: isReadOnly ? L10n.text(.saveAs) : L10n.text(.save))
+        alert.addButton(withTitle: L10n.text(.discard))
+        alert.addButton(withTitle: L10n.text(.cancel))
         isBusy = true
         let response = await alert.beginSheetModal(for: window)
         isBusy = false
@@ -113,7 +114,7 @@ final class WorkspaceProjectController {
         isBusy = true
         defer { isBusy = false }
         do { try adopt(await store.reacquire(opened.handleID)) }
-        catch { await show(error, title: "編集権を再取得できませんでした") }
+        catch { await show(error, title: L10n.text(.reacquireFailed)) }
     }
 
     func release() {
@@ -124,7 +125,7 @@ final class WorkspaceProjectController {
     private func updateTitle() {
         guard let window = workspace?.window else { return }
         let title = url?.deletingPathExtension().lastPathComponent ?? metadata.name
-        window.title = "\(title)\(isReadOnly ? "［構成は読み取り専用］" : "") — Moooyooo Mac Explore"
+        window.title = (isReadOnly ? L10n.format(.readOnlyTitle, title) : title) + " — Moooyooo Mac Explore"
         window.isDocumentEdited = isDirty
         window.representedURL = url
         window.subtitle = opened?.readOnlyReason ?? ""

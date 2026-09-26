@@ -13,10 +13,10 @@ public struct FileEntry: Identifiable, Sendable {
     public var isBrowsable: Bool { isDirectory && !isPackage }
 
     public var kind: String {
-        if isSymbolicLink { return "リンク" }
-        if isPackage { return "パッケージ" }
-        if isDirectory { return "フォルダ" }
-        return url.pathExtension.isEmpty ? "ファイル" : "\(url.pathExtension.uppercased()) ファイル"
+        if isSymbolicLink { return L10n.text(.kindLink) }
+        if isPackage { return L10n.text(.kindPackage) }
+        if isDirectory { return L10n.text(.kindFolder) }
+        return url.pathExtension.isEmpty ? L10n.text(.kindFile) : L10n.format(.extensionKind, url.pathExtension.uppercased())
     }
 }
 

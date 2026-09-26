@@ -1,0 +1,40 @@
+name: Bug report / 不具合
+description: Report a reproducible problem using synthetic data.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        English and Japanese are welcome. For security issues, read SECURITY.md first.
+        Remove private paths, file contents and bookmark data from attachments.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit / バージョン
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: macOS, Mac model, app language / 動作環境・表示言語
+      placeholder: macOS version, Apple Silicon or Intel, English or Japanese
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / 再現手順
+      description: Include how many windows/processes were open and use sample files.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual result / 期待した結果と実際の結果
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized diagnostics / 個人情報を除いた診断情報
+      description: Include screenshots only if they contain no private paths or data.

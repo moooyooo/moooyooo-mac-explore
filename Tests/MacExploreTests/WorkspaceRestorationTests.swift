@@ -9,6 +9,26 @@ import ExplorerPlatform
 @Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["MACEXPLORE_TEST_APP"] != nil))
 @MainActor
 struct WorkspaceRestorationTests {
+    @Test func toolbarAdaptsToLongTranslationsAtMinimumWindowWidth() throws {
+        _ = NSApplication.shared
+        let controller = WorkspaceWindowController(number: 1, directories: [], newWindow: {}, newInstance: {})
+        defer { controller.close() }
+        let window = try #require(controller.window)
+        let content = try #require(window.contentView)
+        let buttons = content.subviews.compactMap { $0 as? NSButton }
+        #expect(buttons.count == 8)
+        for button in buttons { button.title += " — extended translation" }
+        window.setContentSize(NSSize(width: 760, height: 480))
+        content.needsLayout = true
+        content.layoutSubtreeIfNeeded()
+        #expect(buttons.allSatisfy { $0.imagePosition == .imageOnly && content.bounds.contains($0.frame) })
+        #expect(buttons.allSatisfy { !($0.toolTip ?? "").isEmpty && !($0.accessibilityLabel() ?? "").isEmpty })
+        window.setContentSize(NSSize(width: 3000, height: 700))
+        content.needsLayout = true
+        content.layoutSubtreeIfNeeded()
+        #expect(buttons.dropFirst(2).allSatisfy { $0.imagePosition == .imageLeading })
+    }
+
     @Test func restoringViewsKeepsSettingsAndNewChangesDirty() async throws {
         _ = NSApplication.shared
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

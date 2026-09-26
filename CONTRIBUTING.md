@@ -1,35 +1,44 @@
-# 開発への参加
+# Contributing
 
-現在はP1の試作実装段階です。実装は[開発工程](docs/roadmap.md)に沿って追加します。
-管理者は[moooyooo](https://github.com/moooyooo)です。
+English and Japanese contributions are welcome. Maintainer: [moooyooo](https://github.com/moooyooo).
+This is a development preview; see the [roadmap](docs/roadmap.en.md).
 
-## 変更の進め方
+Read the [requirements](docs/requirements.md), [UX](docs/ux.md) and
+[architecture](docs/architecture.md), currently in Japanese. Keep MDI panes,
+independent processes and projects working together. Prefer system frameworks;
+document the size and runtime impact of new dependencies.
 
-1. [要件](docs/requirements.md)と[UX](docs/ux.md)を読み、対応する要件IDを確認する。
-2. 必要な範囲でブランチを作り、動作と理由が分かる単位で変更する。
-3. 変更に応じた検証を行い、結果と未確認事項を記録する。
-4. 動作が変わる場合はREADME・設計・操作説明も更新する。
+Use a focused branch. Code and identifiers use English, four-space indentation,
+UTF-8 and LF. Put app-owned interface text in the shared [localization catalog](docs/localization.md).
 
-コードと識別子は英語、初期の設計資料は日本語を基本とします。
-Swiftコードはスペース4つ、UTF-8、LFを使います。依存の追加には目的・代替案・
-アプリ容量や実行時負荷への影響を記録します。
+## Verification
 
-## 検証
+```sh
+python3 scripts/check-localizations.py
+scripts/build-app.sh release
+scripts/test.sh --integration
+python3 scripts/verify-app.py
+git diff --check
+```
 
-`scripts/test.sh`でSwift Testingのテスト、`scripts/build-app.sh release`でアプリ生成を行います。
-アプリ生成後の`scripts/test.sh --integration`は実アプリを2プロセス起動し、独立性を検証して終了します。
-GUIセッションが利用できるmacOSで実行してください。
-資料の変更では、リンク、要件と工程の整合性、追跡対象に私的データがないことを確認します。
+Integration tests require an active macOS GUI session. They create and terminate
+their own app processes; they do not synthesize mouse/keyboard input. Distinguish
+model tests, AppKit controller checks and manual interaction in your report.
 
-ファイル操作の試験は専用の一時領域と合成データを使います。
-保存・ロック・キャンセルなどデータ保全に関わる変更には、失敗時も含む検証を追加します。
-UI変更はキーボード操作と対象OSで確認し、性能に影響する変更はReleaseビルドで測ります。
+Use temporary directories and synthetic data for file-operation tests. Changes
+affecting saving, locks, cancellation or recovery need failure-path coverage.
+Preserve original files on failure. UI changes require keyboard, IME and accessibility
+checks in both languages; record untested cases. Measure performance in release builds.
 
-## 公開資料とGit
+## Pull requests
 
-個人用プロジェクト、ログ、絶対パスを含む画面写真、認証情報、証明書、署名鍵はコミットしません。
-サンプルは専用ディレクトリで架空の情報から作ります。
-コミット名義は各作業者自身の設定を使います。このリポジトリの初期管理者名義は`moooyooo`です。
+Describe the problem, changed behavior, requirement/issue, verification and remaining
+limitations. Update README, changelog and related design documents. Do not mark
+roadmap stages complete based only on implementation.
 
-公開前にライセンス、Issueテンプレート、報告先、英語の案内を整えます。
-PRには問題と変更後の動作、実施した検証、関連する要件や制約を記載してください。
+Never commit credentials, signing keys, personal projects/recovery records, private
+paths or unreviewed screenshots. Use [synthetic fixtures](examples/README.md).
+Use your own Git identity; the original maintainer identity is moooyooo.
+Report vulnerabilities through [SECURITY.md](SECURITY.md).
+
+Contributions are made under this repository's [MIT license](LICENSE).

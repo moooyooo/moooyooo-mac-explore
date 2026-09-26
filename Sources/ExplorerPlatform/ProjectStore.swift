@@ -7,12 +7,12 @@ public enum StorageError: Error, LocalizedError {
     case locked, externalChange, hardLink, notLocal, invalidFile, closed
     public var errorDescription: String? {
         switch self {
-        case .locked: "別のウィンドウまたはプロセスが編集中です。別名保存するか、編集権を再取得してください。"
-        case .externalChange: "保存先が外部で変更されました。上書きを停止しました。別名保存するか、最新の内容を開き直してください。"
-        case .hardLink: "ハードリンクされたプロジェクトには保存できません。別名保存してください。"
-        case .notLocal: "プロジェクトはローカルディスクに保存してください。"
-        case .invalidFile: "通常のローカルファイルを指定してください。"
-        case .closed: "プロジェクトは閉じられています。"
+        case .locked: L10n.text(.storageLocked)
+        case .externalChange: L10n.text(.storageExternalChange)
+        case .hardLink: L10n.text(.storageHardLink)
+        case .notLocal: L10n.text(.storageNotLocal)
+        case .invalidFile: L10n.text(.storageInvalidFile)
+        case .closed: L10n.text(.storageClosed)
         }
     }
 }

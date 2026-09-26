@@ -3,10 +3,11 @@ import PackageDescription
 
 let package = Package(
     name: "MacExplore",
+    defaultLocalization: "en",
     platforms: [.macOS(.v14)],
     products: [.executable(name: "MacExplore", targets: ["MacExplore"])],
     targets: [
-        .target(name: "ExplorerCore"),
+        .target(name: "ExplorerCore", resources: [.process("Resources")]),
         .target(name: "ExplorerPlatform", dependencies: ["ExplorerCore"]),
         .executableTarget(name: "MacExplore", dependencies: ["ExplorerCore", "ExplorerPlatform"]),
         .executableTarget(name: "StorageProbe", dependencies: ["ExplorerCore", "ExplorerPlatform"], path: "Tests/Support/StorageProbe"),

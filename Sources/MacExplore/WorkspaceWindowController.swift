@@ -25,15 +25,15 @@ final class PaneChrome: FlippedView {
          maximize: @escaping () -> Void, close: @escaping () -> Void) {
         self.id = id
         self.browser = browser
-        self.maximizeButton = ActionButton("最大化／復元", symbol: "arrow.up.left.and.arrow.down.right", action: maximize)
+        self.maximizeButton = ActionButton(L10n.text(.maximizeRestore), symbol: "arrow.up.left.and.arrow.down.right", action: maximize)
         super.init(frame: .zero)
         wantsLayer = true
         layer?.cornerRadius = 5
         layer?.masksToBounds = true
         titleBar.buttons = [
-            ActionButton("最小化", symbol: "minus", action: minimize),
+            ActionButton(L10n.text(.minimize), symbol: "minus", action: minimize),
             maximizeButton,
-            ActionButton("閉じる", symbol: "xmark", action: close),
+            ActionButton(L10n.text(.close), symbol: "xmark", action: close),
         ]
         for button in titleBar.buttons {
             button.imagePosition = .imageOnly
@@ -46,7 +46,7 @@ final class PaneChrome: FlippedView {
         addSubview(grip)
         grip.setAccessibilityElement(true)
         grip.setAccessibilityRole(.button)
-        grip.setAccessibilityLabel("子画面のサイズを変更")
+        grip.setAccessibilityLabel(L10n.text(.resizePaneAccessibility))
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
         setAccessibilityIdentifier("pane-\(id)")
@@ -67,12 +67,12 @@ final class PaneChrome: FlippedView {
         titleBar.label.stringValue = name
         titleBar.label.toolTip = pane.directory.path
         titleBar.active = active
-        titleBar.setAccessibilityLabel("\(name)を移動。ダブルクリックで最大化")
-        setAccessibilityLabel("\(name)\(active ? "、アクティブ" : "")")
+        titleBar.setAccessibilityLabel(L10n.format(.movePaneAccessibility, name))
+        setAccessibilityLabel(active ? L10n.format(.activePaneAccessibility, name) : name)
         layer?.borderColor = (active ? NSColor.controlAccentColor : NSColor.separatorColor).cgColor
         layer?.borderWidth = active ? 2 : 1
         grip.isHidden = pane.presentation == .maximized
-        maximizeButton.image = NSImage(systemSymbolName: pane.presentation == .maximized ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right", accessibilityDescription: "最大化／復元")
+        maximizeButton.image = NSImage(systemSymbolName: pane.presentation == .maximized ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right", accessibilityDescription: L10n.text(.maximizeRestore))
     }
 }
 
@@ -92,7 +92,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     private let shelf = NSScrollView()
     private let shelfContent = FlippedView()
     private let hint = NSTextField(labelWithString: "")
-    private let emptyMessage = NSTextField(labelWithString: "新しいExplorerを開いてください（⌘N / Ctrl+N）")
+    private let emptyMessage = NSTextField(labelWithString: L10n.text(.emptyWorkspace))
     private var toolbar: [NSButton] = []
     private var shelfIDs: [UUID] = []
     private var dragStart: PaneFrame?
@@ -112,7 +112,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         window.minSize = NSSize(width: 760, height: 480)
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
-        window.title = "ワークスペース \(number) — Moooyooo Mac Explore"
+        window.title = L10n.format(.workspaceTitle, number)
         super.init(window: window)
         window.workspace = self
         window.delegate = self
@@ -128,19 +128,19 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         canvas.addSubview(emptyMessage)
         root.addSubview(canvas)
         toolbar = [
-            ActionButton("プロジェクトを開く", symbol: "folder", action: openProject),
-            ActionButton("プロジェクトを保存", symbol: "square.and.arrow.down") { [weak self] in
+            ActionButton(L10n.text(.openProject), symbol: "folder", action: openProject),
+            ActionButton(L10n.text(.saveProject), symbol: "square.and.arrow.down") { [weak self] in
                 let project = self?.project
                 Task { await project?.save() }
             },
-            ActionButton("Explorer追加", symbol: "plus") { [weak self] in self?.addPane() },
-            ActionButton("ウィンドウ追加", symbol: "macwindow.badge.plus", action: newWindow),
-            ActionButton("別プロセス", symbol: "square.on.square", action: newInstance),
-            ActionButton("左右に整列", symbol: "rectangle.split.2x1") { [weak self] in self?.arrange(.columns) },
-            ActionButton("上下に整列", symbol: "rectangle.split.1x2") { [weak self] in self?.arrange(.rows) },
-            ActionButton("重ねる", symbol: "square.3.layers.3d") { [weak self] in self?.arrange(.cascade) },
+            ActionButton(L10n.text(.addExplorer), symbol: "plus") { [weak self] in self?.addPane() },
+            ActionButton(L10n.text(.addWindow), symbol: "macwindow.badge.plus", action: newWindow),
+            ActionButton(L10n.text(.newProcess), symbol: "square.on.square", action: newInstance),
+            ActionButton(L10n.text(.tileColumns), symbol: "rectangle.split.2x1") { [weak self] in self?.arrange(.columns) },
+            ActionButton(L10n.text(.tileRows), symbol: "rectangle.split.1x2") { [weak self] in self?.arrange(.rows) },
+            ActionButton(L10n.text(.cascade), symbol: "square.3.layers.3d") { [weak self] in self?.arrange(.cascade) },
         ]
-        for button in toolbar.prefix(2) { button.imagePosition = .imageOnly; button.toolTip = button.title }
+        for button in toolbar { button.toolTip = button.title }
         for button in toolbar { root.addSubview(button) }
         shelf.documentView = shelfContent
         shelf.hasHorizontalScroller = true
@@ -270,7 +270,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.directoryURL = activeBrowser?.directory
-        panel.prompt = "開く"
+        panel.prompt = L10n.text(.open)
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url, let self else { return }
             if let browser = self.activeBrowser { browser.navigate(to: url) }
@@ -298,7 +298,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         if pane.presentation == .maximized { state.toggleMaximize(pane.id); changed() }
         geometryMode = (pane.id, resizing, pane.normalFrame.resolved(in: canvasSize))
         window?.makeFirstResponder(nil)
-        hint.stringValue = "\(resizing ? "サイズ変更" : "移動"): 矢印キー · Shiftで大きく · Enterで確定 · Escで取消"
+        hint.stringValue = L10n.text(resizing ? .resizeHint : .moveHint)
         render()
     }
 
@@ -329,9 +329,14 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     private func layoutWorkspace() {
         let width = root.bounds.width
         let height = root.bounds.height
+        // Measure full labels before choosing the compact layout, so resizing restores them.
+        for (index, button) in toolbar.enumerated() { button.imagePosition = index < 2 ? .imageOnly : .imageLeading }
+        let naturalWidths = toolbar.map { $0.imagePosition == .imageOnly ? CGFloat(32) : max(72, $0.intrinsicContentSize.width + 4) }
+        let compact = naturalWidths.reduce(0, +) + CGFloat(toolbar.count - 1) * 6 > width - 16
         var x: CGFloat = 8
-        for button in toolbar {
-            let buttonWidth = button.imagePosition == .imageOnly ? 32 : max(72, button.intrinsicContentSize.width + 4)
+        for (index, button) in toolbar.enumerated() {
+            if compact { button.imagePosition = .imageOnly }
+            let buttonWidth = compact ? 32 : naturalWidths[index]
             button.frame = NSRect(x: x, y: 8, width: buttonWidth, height: 28)
             x += buttonWidth + 6
         }
@@ -368,7 +373,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
             for (index, pane) in minimized.enumerated() {
                 let button = ActionButton(pane.directory.lastPathComponent, symbol: "macwindow") { [weak self] in self?.activate(pane.id) }
                 button.frame = NSRect(x: CGFloat(index) * 172, y: 0, width: 166, height: 25)
-                button.toolTip = "\(pane.directory.lastPathComponent)を復元"
+                button.toolTip = L10n.format(.restorePane, pane.directory.lastPathComponent)
                 shelfContent.addSubview(button)
             }
             shelfContent.frame = NSRect(x: 0, y: 0, width: CGFloat(minimized.count) * 172, height: 26)

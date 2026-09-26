@@ -1,4 +1,5 @@
 import AppKit
+import ExplorerCore
 import ExplorerPlatform
 
 @MainActor
@@ -7,7 +8,7 @@ private final class FolderNode {
     var name: String
     var children: [FolderNode]?
     var task: Task<Void, Never>?
-    init(_ url: URL?, name: String? = nil) { self.url = url; self.name = name ?? url?.lastPathComponent ?? "読み込み中…" }
+    init(_ url: URL?, name: String? = nil) { self.url = url; self.name = name ?? url?.lastPathComponent ?? L10n.text(.loading) }
     deinit { task?.cancel() }
 }
 
@@ -33,7 +34,7 @@ final class FolderTreeController: NSViewController, NSOutlineViewDataSource, NSO
         outline.rowHeight = 25
         outline.indentationPerLevel = 12
         outline.dataSource = self; outline.delegate = self
-        outline.setAccessibilityLabel("フォルダツリー")
+        outline.setAccessibilityLabel(L10n.text(.folderTree))
         scroll.documentView = outline
         scroll.hasVerticalScroller = true; scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
@@ -45,9 +46,9 @@ final class FolderTreeController: NSViewController, NSOutlineViewDataSource, NSO
         stop()
         expanded = Set(urls); self.favorites = favorites; hidden = showHidden
         let home = FileManager.default.homeDirectoryForCurrentUser
-        roots = [FolderNode(home, name: "ホーム"), FolderNode(home.appendingPathComponent("Downloads"), name: "ダウンロード")]
+        roots = [FolderNode(home, name: L10n.text(.home)), FolderNode(home.appendingPathComponent("Downloads"), name: L10n.text(.downloads))]
         roots += favorites.map { FolderNode($0, name: "★ " + $0.lastPathComponent) }
-        roots += [FolderNode(URL(fileURLWithPath: "/"), name: "コンピュータ"), FolderNode(URL(fileURLWithPath: "/Volumes"), name: "ボリューム")]
+        roots += [FolderNode(URL(fileURLWithPath: "/"), name: L10n.text(.computer)), FolderNode(URL(fileURLWithPath: "/Volumes"), name: L10n.text(.volumes))]
         reloading = true
         outline.reloadData()
         restoreExpansion(roots)
@@ -91,7 +92,7 @@ final class FolderTreeController: NSViewController, NSOutlineViewDataSource, NSO
                 node.task = nil
             } catch {
                 guard !Task.isCancelled, let self, let node else { return }
-                node.children = [FolderNode(nil, name: "開けません（再展開で更新）")]
+                node.children = [FolderNode(nil, name: L10n.text(.treeOpenFailed))]
                 self.outline.reloadItem(node, reloadChildren: true)
                 node.task = nil
             }

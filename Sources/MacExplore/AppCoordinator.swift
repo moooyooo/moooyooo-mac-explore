@@ -28,7 +28,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     private var pendingProjectURLs: [URL] = []
     private var launched = false
     private var opening: Set<String> = []
-    private let recentMenu = NSMenu(title: "最近使ったプロジェクト")
+    private let recentMenu = NSMenu(title: L10n.text(.recentProjects))
     private var workspaceObserver: NSObjectProtocol?
     private var recoveryErrorShown = false
     private var instanceArguments: [String] = []
@@ -68,11 +68,12 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
             projectStore = ProjectStore(supportDirectory: supportDirectory)
             recentStore = RecentProjectStore(supportDirectory: supportDirectory)
         }
+        if let language = LanguageSettings.argument() { instanceArguments += ["--language", language.rawValue] }
         let session = SessionStore(instanceID: instanceID, supportDirectory: supportDirectory)
         sessionStore = session
         Task {
             do { try await session.start(); sessionReady = true; scheduleRecovery() }
-            catch { await showError(error, title: "復旧データを保存できません") }
+            catch { await showError(error, title: L10n.text(.recoverySaveFailed)) }
             await refreshRecentMenu()
         }
         if folders.isEmpty { folders = [FileManager.default.homeDirectoryForCurrentUser] }
@@ -163,7 +164,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
             do { try await InstanceLauncher.launch(arguments: instanceArguments + arguments) }
             catch {
                 let alert = NSAlert(error: error)
-                alert.messageText = "別プロセスを起動できませんでした"
+                alert.messageText = L10n.text(.instanceFailed)
                 alert.runModal()
             }
         }
@@ -213,6 +214,10 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(changeLanguage(_:)) {
+            menuItem.state = (menuItem.representedObject as? String) == LanguageSettings.preference().rawValue ? .on : .off
+            return !terminating
+        }
         if (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true { return false }
         guard let command = AppCommand(rawValue: menuItem.tag) else { return true }
         switch command {
@@ -267,75 +272,96 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
             menu.addItem(item)
         }
         let app = menu("Moooyooo Mac Explore")
-        app.addItem(withTitle: "Moooyooo Mac Exploreについて", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        app.addItem(withTitle: L10n.text(.about), action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        let languageItem = NSMenuItem(title: L10n.text(.languageMenu), action: nil, keyEquivalent: "")
+        let languageMenu = NSMenu(title: languageItem.title)
+        for (language, key): (AppLanguage, L10n.Key) in [(.system, .languageSystem), (.en, .languageEnglish), (.ja, .languageJapanese)] {
+            let item = NSMenuItem(title: L10n.text(key), action: #selector(changeLanguage(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = language.rawValue
+            languageMenu.addItem(item)
+        }
+        languageItem.submenu = languageMenu
+        app.addItem(languageItem)
         app.addItem(.separator())
-        app.addItem(withTitle: "Moooyooo Mac Exploreを隠す", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        app.addItem(withTitle: L10n.text(.hideApp), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         app.addItem(.separator())
-        app.addItem(withTitle: "Moooyooo Mac Exploreを終了", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        app.addItem(withTitle: L10n.text(.quitApp), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
-        let file = menu("ファイル")
-        add(file, "新しいExplorer", .newPane, "n")
-        add(file, "新しいMDIウィンドウ", .newWindow, "n", [.command, .option])
-        add(file, "別プロセスで起動", .newInstance)
+        let file = menu(L10n.text(.menuFile))
+        add(file, L10n.text(.newExplorer), .newPane, "n")
+        add(file, L10n.text(.newMDIWindow), .newWindow, "n", [.command, .option])
+        add(file, L10n.text(.launchProcess), .newInstance)
         file.addItem(.separator())
-        add(file, "フォルダを開く…", .openFolder, "o", [.command, .shift])
-        add(file, "選択したフォルダを新しいExplorerで開く", .openInNewPane)
+        add(file, L10n.text(.chooseFolder), .openFolder, "o", [.command, .shift])
+        add(file, L10n.text(.openSelectionInPane), .openInNewPane)
         file.addItem(.separator())
-        add(file, "Explorerを閉じる", .closePane, "w")
-        add(file, "MDIウィンドウを閉じる", .closeWindow, "w", [.command, .shift])
+        add(file, L10n.text(.closeExplorer), .closePane, "w")
+        add(file, L10n.text(.closeMDIWindow), .closeWindow, "w", [.command, .shift])
 
-        let project = menu("プロジェクト")
-        add(project, "新規プロジェクト", .newWindow)
-        add(project, "プロジェクトを開く…", .openProject, "o")
-        add(project, "このウィンドウを切り替える…", .switchProject)
-        add(project, "保存済みプロジェクトを別プロセスで開く", .projectInNewInstance)
+        let project = menu(L10n.text(.menuProject))
+        add(project, L10n.text(.newProject), .newWindow)
+        add(project, L10n.text(.chooseProject), .openProject, "o")
+        add(project, L10n.text(.switchProject), .switchProject)
+        add(project, L10n.text(.projectNewProcess), .projectInNewInstance)
         let recent = NSMenuItem(title: recentMenu.title, action: nil, keyEquivalent: "")
         recent.submenu = recentMenu; project.addItem(recent)
         recentMenu.delegate = self
         project.addItem(.separator())
-        add(project, "プロジェクトを保存…", .saveProject, "s")
-        add(project, "別名で保存…", .saveProjectAs, "s", [.command, .shift])
-        add(project, "最新を読み直して編集権を再取得…", .reacquireProject)
+        add(project, L10n.text(.saveProjectMenu), .saveProject, "s")
+        add(project, L10n.text(.saveAsMenu), .saveProjectAs, "s", [.command, .shift])
+        add(project, L10n.text(.reacquireProject), .reacquireProject)
         project.addItem(.separator())
-        add(project, "終了していないセッションを復旧…", .recoverSession)
+        add(project, L10n.text(.recoverSession), .recoverSession)
 
-        let edit = menu("編集")
-        for (title, selector, key) in [("元に戻す", "undo:", "z"), ("切り取り", "cut:", "x"), ("コピー", "copy:", "c"), ("貼り付け", "paste:", "v"), ("すべて選択", "selectAll:", "a")] {
+        let edit = menu(L10n.text(.menuEdit))
+        for (title, selector, key) in [(L10n.text(.undo), "undo:", "z"), (L10n.text(.cut), "cut:", "x"), (L10n.text(.copy), "copy:", "c"), (L10n.text(.paste), "paste:", "v"), (L10n.text(.selectAll), "selectAll:", "a")] {
             edit.addItem(withTitle: title, action: NSSelectorFromString(selector), keyEquivalent: key)
         }
-        let view = menu("表示")
-        add(view, "更新", .refresh, "r")
-        add(view, "このフォルダ内を検索", .focusSearch, "f")
-        add(view, "このフォルダのお気に入りを切り替える", .favorite)
-        let go = menu("移動")
-        add(go, "戻る", .back, "[")
-        add(go, "進む", .forward, "]")
-        add(go, "上の階層", .up, "\u{f700}")
-        add(go, "パスへ移動", .focusAddress, "l")
-        let window = menu("ウィンドウ")
-        add(window, "次のExplorer", .nextPane, "\t", .control)
-        add(window, "前のExplorer", .previousPane, "\t", [.control, .shift])
+        let view = menu(L10n.text(.menuView))
+        add(view, L10n.text(.refresh), .refresh, "r")
+        add(view, L10n.text(.searchFolder), .focusSearch, "f")
+        add(view, L10n.text(.toggleFavorite), .favorite)
+        let go = menu(L10n.text(.menuGo))
+        add(go, L10n.text(.back), .back, "[")
+        add(go, L10n.text(.forward), .forward, "]")
+        add(go, L10n.text(.parentFolder), .up, "\u{f700}")
+        add(go, L10n.text(.goToPath), .focusAddress, "l")
+        let window = menu(L10n.text(.menuWindow))
+        add(window, L10n.text(.nextExplorer), .nextPane, "\t", .control)
+        add(window, L10n.text(.previousExplorer), .previousPane, "\t", [.control, .shift])
         window.addItem(.separator())
-        add(window, "子画面を最大化／復元", .maximize)
-        add(window, "子画面を最小化", .minimize)
-        add(window, "子画面を移動…", .move)
-        add(window, "子画面のサイズを変更…", .resize)
+        add(window, L10n.text(.maximizePane), .maximize)
+        add(window, L10n.text(.minimizePane), .minimize)
+        add(window, L10n.text(.movePane), .move)
+        add(window, L10n.text(.resizePane), .resize)
         window.addItem(.separator())
-        add(window, "左右に整列", .columns)
-        add(window, "上下に整列", .rows)
-        add(window, "重ねて表示", .cascade)
+        add(window, L10n.text(.tileColumns), .columns)
+        add(window, L10n.text(.tileRows), .rows)
+        add(window, L10n.text(.cascadeMenu), .cascade)
         window.addItem(.separator())
         NSApp.windowsMenu = window
-        let help = menu("ヘルプ")
-        add(help, "ショートカット一覧", .shortcuts)
-        add(help, "診断情報", .diagnostics)
+        let help = menu(L10n.text(.menuHelp))
+        add(help, L10n.text(.shortcutList), .shortcuts)
+        add(help, L10n.text(.diagnostics), .diagnostics)
         NSApp.helpMenu = help
+    }
+
+    @objc private func changeLanguage(_ sender: NSMenuItem) {
+        guard let value = sender.representedObject as? String, let language = AppLanguage(rawValue: value) else { return }
+        UserDefaults.standard.set(language.rawValue, forKey: LanguageSettings.preferenceKey)
+        // An explicit launch override is no longer needed for subsequent child processes.
+        if let index = instanceArguments.firstIndex(of: "--language") { instanceArguments.removeSubrange(index...index + 1) }
+        let alert = NSAlert()
+        alert.messageText = L10n.text(.languageNextLaunch)
+        alert.informativeText = L10n.text(.languageNextLaunchDetail)
+        alert.runModal()
     }
 
     private func showShortcuts() {
         let alert = NSAlert()
-        alert.messageText = "主なショートカット"
-        alert.informativeText = "Explorer追加: Cmd / Ctrl + N\n親ウィンドウ追加: Cmd / Ctrl + Option + N\n子を閉じる: Cmd / Ctrl + W\n親を閉じる: Cmd / Ctrl + Shift + W\n次／前の子: Ctrl + Tab / Ctrl + Shift + Tab\nパス入力: Cmd / Ctrl + L\n戻る／進む: Option + ← / →\n上の階層: Option + ↑\n更新: F5 / Cmd + R\nフォルダ内検索: Cmd / Ctrl + F\n開く: Enter\nプロジェクトを開く: Cmd / Ctrl + O\nプロジェクト保存: Cmd / Ctrl + S\n別名保存: Cmd / Ctrl + Shift + S\n子の移動・サイズ変更: ウィンドウメニュー\n\nファイルの書き換え操作は、後続の開発工程です。"
+        alert.messageText = L10n.text(.shortcutsTitle)
+        alert.informativeText = L10n.text(.shortcutsBody)
         alert.runModal()
     }
 
@@ -349,6 +375,11 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
             "readOnlyProjects": windows.filter { $0.project?.isReadOnly == true }.count,
             "physicalFootprintBytes": ProcessMetrics.physicalFootprint() ?? 0,
             "os": ProcessInfo.processInfo.operatingSystemVersionString,
+            "language": L10n.current.language.rawValue,
+            "preferredLocalizations": Bundle.main.preferredLocalizations,
+            "localizationBundled": Localizer.resourceBundle.bundleURL.resolvingSymlinksInPath().standardizedFileURL
+                == Bundle.main.resourceURL?.appendingPathComponent("MacExplore_ExplorerCore.bundle").resolvingSymlinksInPath().standardizedFileURL,
+            "menuTitles": NSApp.mainMenu?.items.map(\.title) ?? [],
         ]
         if let firstDirectoryTime { data["firstDirectorySecondsFromMain"] = firstDirectoryTime }
         return data
@@ -357,9 +388,11 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     private func showDiagnostics() {
         let data = diagnostics()
         let alert = NSAlert()
-        alert.messageText = "診断情報"
+        alert.messageText = L10n.text(.diagnostics)
         let footprint = Double(ProcessMetrics.physicalFootprint() ?? 0) / 1_048_576
-        alert.informativeText = "PID: \(data["pid"]!)\nインスタンス: \(instanceID.uuidString)\n親ウィンドウ: \(windows.count)\nExplorer: \(data["panes"]!)\nメモリ: \(String(format: "%.1f", footprint)) MiB\n\(data["os"]!)"
+        alert.informativeText = L10n.format(.diagnosticsBody, ProcessInfo.processInfo.processIdentifier,
+                                          instanceID.uuidString, windows.count, data["panes"] as? Int ?? 0,
+                                          footprint, ProcessInfo.processInfo.operatingSystemVersionString)
         alert.runModal()
     }
 
@@ -390,7 +423,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
             let panel = NSOpenPanel()
             panel.allowedContentTypes = [WorkspaceProjectController.fileType]
             panel.canChooseDirectories = false; panel.allowsMultipleSelection = false
-            panel.title = switching ? "現在のプロジェクトを切り替える" : "プロジェクトを別ウィンドウで開く"
+            panel.title = switching ? L10n.text(.switchProjectTitle) : L10n.text(.openProjectWindow)
             let response: NSApplication.ModalResponse
             if let window { response = await panel.beginSheetModal(for: window) }
             else { response = await panel.begin() }
@@ -423,7 +456,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
                 recordRecent(opened.url)
             } catch { await projectStore.close(opened.handleID); throw error }
         } catch {
-            await showError(error, title: "プロジェクトを開けませんでした")
+            await showError(error, title: L10n.text(.openProjectFailed))
             if windows.isEmpty { createWindow() }
         }
     }
@@ -431,7 +464,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     private func recordRecent(_ url: URL) {
         Task {
             do { try await recentStore.record(url); await refreshRecentMenu() }
-            catch { await showError(error, title: "最近使った一覧を更新できませんでした（プロジェクトは保存済みです）") }
+            catch { await showError(error, title: L10n.text(.recentUpdateFailed)) }
         }
     }
 
@@ -446,7 +479,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
             recentMenu.addItem(item)
         }
         if urls.isEmpty {
-            let item = NSMenuItem(title: "まだありません", action: nil, keyEquivalent: "")
+            let item = NSMenuItem(title: L10n.text(.noRecentProjects), action: nil, keyEquivalent: "")
             item.isEnabled = false; recentMenu.addItem(item)
         }
     }
@@ -473,7 +506,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
             catch {
                 guard !self.recoveryErrorShown else { return }
                 self.recoveryErrorShown = true
-                await self.showError(error, title: "復旧データを保存できませんでした")
+                await self.showError(error, title: L10n.text(.recoveryWriteFailed))
             }
         }
     }
@@ -483,14 +516,15 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         do {
             let sessions = try await sessionStore.available()
             let alert = NSAlert()
-            alert.messageText = sessions.isEmpty ? "復旧できるセッションはありません" : "復旧するセッションを選んでください"
-            alert.informativeText = "実行中の別プロセスのセッションは表示しません。復旧内容は未保存の新しいプロジェクトとして開きます。"
+            alert.messageText = sessions.isEmpty ? L10n.text(.noRecovery) : L10n.text(.chooseRecovery)
+            alert.informativeText = L10n.text(.recoveryDetail)
             guard !sessions.isEmpty else { alert.runModal(); return }
             let choices = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 380, height: 28))
             let formatter = DateFormatter(); formatter.dateStyle = .medium; formatter.timeStyle = .short
-            for session in sessions { choices.addItem(withTitle: "\(formatter.string(from: session.updated)) · \(session.workspaces.count) ウィンドウ") }
+            formatter.locale = L10n.locale
+            for session in sessions { choices.addItem(withTitle: formatter.string(from: session.updated) + " · " + L10n.format(.windowCount, session.workspaces.count)) }
             alert.accessoryView = choices
-            alert.addButton(withTitle: "復旧"); alert.addButton(withTitle: "キャンセル")
+            alert.addButton(withTitle: L10n.text(.recover)); alert.addButton(withTitle: L10n.text(.cancel))
             let response: NSApplication.ModalResponse
             if let window = current?.window { response = await alert.beginSheetModal(for: window) }
             else { response = alert.runModal() }
@@ -508,7 +542,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
                 try? await sessionStore.finishClaim(session.id, consumed: false)
                 throw error
             }
-        } catch { await showError(error, title: "セッションを復旧できませんでした") }
+        } catch { await showError(error, title: L10n.text(.recoveryFailed)) }
     }
 
     private func showError(_ error: Error, title: String) async {

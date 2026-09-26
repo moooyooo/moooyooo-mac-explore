@@ -56,7 +56,7 @@ public struct ProjectDocument: Codable, Equatable, Sendable {
     public var zOrder: [UUID]
     public var activePaneID: UUID?
 
-    public init(name: String = "名称未設定", workspace: Workspace = .init()) {
+    public init(name: String = "Untitled", workspace: Workspace = .init()) {
         self.name = name
         panes = workspace.panes.map { SavedPane(pane: $0) }
         zOrder = workspace.zOrder; activePaneID = workspace.activePaneID
@@ -64,27 +64,27 @@ public struct ProjectDocument: Codable, Equatable, Sendable {
 
     public func validate() throws {
         guard schemaVersion == Self.currentVersion else { throw ProjectError.unsupportedVersion(schemaVersion) }
-        guard !name.isEmpty, name.count <= 255, panes.count <= Self.maximumPanes else { throw ProjectError.invalid("名前または画面数") }
+        guard !name.isEmpty, name.count <= 255, panes.count <= Self.maximumPanes else { throw ProjectError.invalid(L10n.text(.fieldName)) }
         let ids = Set(panes.map(\.id))
-        guard ids.count == panes.count, Set(zOrder) == ids, zOrder.count == ids.count else { throw ProjectError.invalid("子画面のIDまたは重なり順") }
+        guard ids.count == panes.count, Set(zOrder) == ids, zOrder.count == ids.count else { throw ProjectError.invalid(L10n.text(.fieldOrder)) }
         if let activePaneID {
-            guard panes.contains(where: { $0.id == activePaneID && $0.presentation != .minimized }) else { throw ProjectError.invalid("アクティブな子画面") }
-        } else if panes.contains(where: { $0.presentation != .minimized }) { throw ProjectError.invalid("アクティブな子画面が未指定") }
+            guard panes.contains(where: { $0.id == activePaneID && $0.presentation != .minimized }) else { throw ProjectError.invalid(L10n.text(.fieldActive)) }
+        } else if panes.contains(where: { $0.presentation != .minimized }) { throw ProjectError.invalid(L10n.text(.fieldMissingActive)) }
         let maximized = panes.filter { $0.presentation == .maximized }
-        guard maximized.count <= 1, maximized.first.map({ $0.id == activePaneID }) ?? true else { throw ProjectError.invalid("最大化した子画面") }
+        guard maximized.count <= 1, maximized.first.map({ $0.id == activePaneID }) ?? true else { throw ProjectError.invalid(L10n.text(.fieldMaximized)) }
         if let frame = windowFrame {
             guard [frame.x, frame.y, frame.width, frame.height].allSatisfy(\.isFinite),
                   abs(frame.x) <= 100_000, abs(frame.y) <= 100_000,
                   (100...20_000).contains(frame.width), (100...20_000).contains(frame.height)
-            else { throw ProjectError.invalid("親ウィンドウの位置とサイズ") }
+            else { throw ProjectError.invalid(L10n.text(.fieldWindowFrame)) }
         }
         for pane in panes {
             let f = pane.normalFrame
             guard [f.x, f.y, f.width, f.height].allSatisfy(\.isFinite),
                   f.x >= 0, f.y >= 0, f.width > 0, f.height > 0,
                   f.x + f.width <= 1.000001, f.y + f.height <= 1.000001
-            else { throw ProjectError.invalid("子画面の位置とサイズ") }
-            guard Self.isLocalFileURL(pane.folder.url), (pane.folder.bookmark?.count ?? 0) <= 131_072 else { throw ProjectError.invalid("フォルダ参照") }
+            else { throw ProjectError.invalid(L10n.text(.fieldPaneFrame)) }
+            guard Self.isLocalFileURL(pane.folder.url), (pane.folder.bookmark?.count ?? 0) <= 131_072 else { throw ProjectError.invalid(L10n.text(.fieldFolder)) }
             let settings = pane.settings
             guard settings.columns.count == FileColumn.allCases.count,
                   Set(settings.columns.map(\.column)) == Set(FileColumn.allCases),
@@ -93,7 +93,7 @@ public struct ProjectDocument: Codable, Equatable, Sendable {
                   settings.filter.count <= 1_024, settings.expandedDirectories.count <= 256,
                   settings.favorites.count <= 32,
                   (settings.expandedDirectories + settings.favorites).allSatisfy(Self.isLocalFileURL)
-            else { throw ProjectError.invalid("一覧またはツリーの表示設定") }
+            else { throw ProjectError.invalid(L10n.text(.fieldSettings)) }
         }
     }
 
@@ -127,9 +127,9 @@ public enum ProjectError: Error, LocalizedError, Equatable {
     case unsupportedVersion(Int), invalid(String), tooLarge
     public var errorDescription: String? {
         switch self {
-        case .unsupportedVersion(let version): "未対応のプロジェクト形式です（バージョン \(version)）。"
-        case .invalid(let field): "プロジェクトの\(field)が不正です。"
-        case .tooLarge: "プロジェクトの上限サイズ（8 MiB）を超えています。"
+        case .unsupportedVersion(let version): L10n.format(.unsupportedProject, version)
+        case .invalid(let field): L10n.format(.invalidProject, field)
+        case .tooLarge: L10n.text(.projectTooLarge)
         }
     }
 }

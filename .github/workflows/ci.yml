@@ -3,13 +3,18 @@ name: macOS build and test
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   build:
-    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-26]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -20,9 +25,13 @@ jobs:
           sw_vers
           swift --version
           xcode-select -p
-      - name: Test
-        run: scripts/test.sh
+      - name: Check translations
+        run: python3 scripts/check-localizations.py
       - name: Build app
         run: scripts/build-app.sh release
+      - name: Test including real app processes and packaged languages
+        run: scripts/test.sh --integration
+      - name: Verify development distribution
+        run: scripts/package-release.sh --development
       - name: Check whitespace
         run: git diff --check

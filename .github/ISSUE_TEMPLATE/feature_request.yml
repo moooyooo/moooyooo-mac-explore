@@ -1,0 +1,21 @@
+name: Feature request / 機能要望
+description: Describe a workflow and the change that would help.
+title: "[Feature] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Workflow and problem / 使い方と困っていること
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior / 希望する動作
+      description: Mention menus, shortcuts, MDI panes and project persistence when relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and constraints / 代案・制約

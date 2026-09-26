@@ -16,6 +16,12 @@ mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
 cp "$binary_dir/MacExplore" "$app_dir/Contents/MacOS/MacExplore.new"
 mv -f "$app_dir/Contents/MacOS/MacExplore.new" "$app_dir/Contents/MacOS/MacExplore"
 cp Resources/Info.plist "$app_dir/Contents/Info.plist"
+cp LICENSE THIRD_PARTY_NOTICES.md "$app_dir/Contents/Resources/"
+ditto "$binary_dir/MacExplore_ExplorerCore.bundle" "$app_dir/Contents/Resources/MacExplore_ExplorerCore.bundle"
+for language in en ja; do
+    mkdir -p "$app_dir/Contents/Resources/$language.lproj"
+    cp "Resources/$language.lproj/InfoPlist.strings" "$app_dir/Contents/Resources/$language.lproj/InfoPlist.strings"
+done
 plutil -lint "$app_dir/Contents/Info.plist"
 # Local ad-hoc signing only. Developer ID signing/notarization belongs to the release workflow.
 codesign --force --sign - "$app_dir"

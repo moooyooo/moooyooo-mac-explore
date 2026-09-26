@@ -34,11 +34,12 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     private var originalTreeWidth: Double = 160
     private var configuring = true
     private let status = NSTextField(labelWithString: "")
-    private let hiddenToggle = NSButton(checkboxWithTitle: "隠し項目", target: nil, action: nil)
+    private let hiddenToggle = NSButton(checkboxWithTitle: L10n.text(.hiddenItems), target: nil, action: nil)
     private var navButtons: [NSButton] = []
     private var watchWarning: String?
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = L10n.locale
         formatter.dateStyle = .short
         formatter.timeStyle = .short
         return formatter
@@ -65,10 +66,10 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         root.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 
         navButtons = [
-            ActionButton("戻る", symbol: "chevron.left") { [weak self] in self?.goBack() },
-            ActionButton("進む", symbol: "chevron.right") { [weak self] in self?.goForward() },
-            ActionButton("上へ", symbol: "arrow.up") { [weak self] in self?.goUp() },
-            ActionButton("更新", symbol: "arrow.clockwise") { [weak self] in self?.reload() },
+            ActionButton(L10n.text(.back), symbol: "chevron.left") { [weak self] in self?.goBack() },
+            ActionButton(L10n.text(.forward), symbol: "chevron.right") { [weak self] in self?.goForward() },
+            ActionButton(L10n.text(.up), symbol: "arrow.up") { [weak self] in self?.goUp() },
+            ActionButton(L10n.text(.refresh), symbol: "arrow.clockwise") { [weak self] in self?.reload() },
         ]
         for button in navButtons {
             button.toolTip = button.title
@@ -76,14 +77,14 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
             root.addSubview(button)
         }
         address.font = .systemFont(ofSize: 12)
-        address.placeholderString = "フォルダのパス"
+        address.placeholderString = L10n.text(.folderPath)
         address.target = self
         address.action = #selector(enteredAddress)
-        address.setAccessibilityLabel("フォルダのパス")
+        address.setAccessibilityLabel(L10n.text(.folderPath))
         address.setAccessibilityIdentifier("address-\(paneID)")
         root.addSubview(address)
-        search.placeholderString = "このフォルダ内を検索"
-        search.setAccessibilityLabel("このフォルダ内を検索")
+        search.placeholderString = L10n.text(.searchFolder)
+        search.setAccessibilityLabel(L10n.text(.searchFolder))
         search.delegate = self
         search.stringValue = settings.filter
         root.addSubview(search)
@@ -94,7 +95,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         root.addSubview(hiddenToggle)
 
         let columns: [(String, String, CGFloat)] = [
-            ("name", "名前", 240), ("modified", "更新日時", 140), ("kind", "種類", 100), ("size", "サイズ", 80),
+            ("name", L10n.text(.columnName), 240), ("modified", L10n.text(.columnModified), 140), ("kind", L10n.text(.columnKind), 100), ("size", L10n.text(.columnSize), 80),
         ]
         for stored in settings.columns {
             guard let (key, title, _) = columns.first(where: { $0.0 == stored.column.rawValue }) else { continue }
@@ -116,7 +117,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         table.doubleAction = #selector(openSelected)
         table.onOpen = { [weak self] in self?.openSelected() }
         table.onBack = { [weak self] in self?.goBack() }
-        table.setAccessibilityLabel("ファイル一覧")
+        table.setAccessibilityLabel(L10n.text(.fileList))
         table.sortDescriptors = [NSSortDescriptor(key: settings.sortColumn.rawValue, ascending: settings.ascending)]
         scroll.documentView = table
         scroll.hasVerticalScroller = true
@@ -131,7 +132,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         breadcrumb.action = #selector(clickedBreadcrumb)
         breadcrumb.doubleAction = #selector(clickedBreadcrumb)
         breadcrumb.url = directory
-        breadcrumb.setAccessibilityLabel("フォルダのパンくず")
+        breadcrumb.setAccessibilityLabel(L10n.text(.breadcrumbs))
         root.addSubview(breadcrumb)
         addChild(tree)
         root.addSubview(tree.view)
@@ -142,7 +143,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         divider.layer?.backgroundColor = NSColor.separatorColor.cgColor
         divider.setAccessibilityElement(true)
         divider.setAccessibilityRole(.button)
-        divider.setAccessibilityLabel("フォルダツリーの幅を変更")
+        divider.setAccessibilityLabel(L10n.text(.resizeTree))
         divider.onBegin = { [weak self] in self?.originalTreeWidth = self?.settings.treeWidth ?? 160 }
         divider.onDrag = { [weak self] dx, _ in
             guard let self else { return }
@@ -173,8 +174,9 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         for i in 0..<3 { navButtons[i].frame = NSRect(x: 5 + CGFloat(i) * 29, y: 5, width: 27, height: 27) }
         navButtons[3].frame = NSRect(x: width - 34, y: 5, width: 28, height: 27)
         address.frame = NSRect(x: 95, y: 7, width: max(40, width - 134), height: 24)
-        hiddenToggle.frame = NSRect(x: 8, y: 38, width: 96, height: 24)
-        search.frame = NSRect(x: 111, y: 39, width: max(60, width - 119), height: 24)
+        let hiddenWidth = max(96, hiddenToggle.intrinsicContentSize.width)
+        hiddenToggle.frame = NSRect(x: 8, y: 38, width: hiddenWidth, height: 24)
+        search.frame = NSRect(x: hiddenWidth + 23, y: 39, width: max(60, width - hiddenWidth - 31), height: 24)
         breadcrumb.frame = NSRect(x: 7, y: 68, width: max(0, width - 14), height: 22)
         let sidebarWidth: CGFloat = width >= 500 ? min(settings.treeWidth, width * 0.42) : 0
         tree.view.isHidden = sidebarWidth == 0
@@ -192,7 +194,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         generation = request
         loading = true
         errorMessage = nil
-        status.stringValue = "読み込み中…"
+        status.stringValue = L10n.text(.loading)
         address.stringValue = url.path
         let includeHidden = settings.showHidden
         loadTask = Task { [weak self] in
@@ -293,7 +295,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         guard !loading, visibleEntries.indices.contains(table.selectedRow) else { return }
         let item = visibleEntries[table.selectedRow]
         if item.isBrowsable { navigate(to: item.url) }
-        else if !NSWorkspace.shared.open(item.url) { errorMessage = "既定のアプリで開けませんでした。"; updateStatus() }
+        else if !NSWorkspace.shared.open(item.url) { errorMessage = L10n.text(.openFileFailed); updateStatus() }
     }
 
     func controlTextDidChange(_ obj: Notification) {
@@ -320,7 +322,10 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     }
 
     private func updateStatus() {
-        status.stringValue = errorMessage ?? "\(visibleEntries.count) 項目" + (table.numberOfSelectedRows > 0 ? " · \(table.numberOfSelectedRows) 項目を選択" : "") + (watchWarning.map { " · \($0)" } ?? "")
+        var parts = [L10n.format(.itemCount, visibleEntries.count)]
+        if table.numberOfSelectedRows > 0 { parts.append(L10n.format(.selectedCount, table.numberOfSelectedRows)) }
+        if let watchWarning { parts.append(watchWarning) }
+        status.stringValue = errorMessage ?? parts.joined(separator: " · ")
         status.toolTip = status.stringValue
         status.textColor = errorMessage == nil ? .secondaryLabelColor : .systemRed
     }
@@ -352,7 +357,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
                     self?.scheduleRefresh(for: url)
                 }
             }
-        } catch { watchedURL = nil; watchWarning = "自動更新不可・F5で更新" }
+        } catch { watchedURL = nil; watchWarning = L10n.text(.watchUnavailable) }
     }
 
     private func scheduleRefresh(for url: URL) {
@@ -367,10 +372,10 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     private static func locationError(_ error: Error) -> String {
         let ns = error as NSError
         if (ns.domain == NSCocoaErrorDomain && ns.code == NSFileReadNoPermissionError) ||
-            (ns.domain == NSPOSIXErrorDomain && [13, 1].contains(ns.code)) { return "アクセス権がありません。フォルダの権限を確認してください。" }
+            (ns.domain == NSPOSIXErrorDomain && [13, 1].contains(ns.code)) { return L10n.text(.folderPermission) }
         if (ns.domain == NSCocoaErrorDomain && [NSFileNoSuchFileError, NSFileReadNoSuchFileError].contains(ns.code)) ||
-            (ns.domain == NSPOSIXErrorDomain && ns.code == 2) { return "フォルダが見つかりません。接続後にF5、またはパスを選び直してください。" }
-        return "開けません: \(error.localizedDescription)"
+            (ns.domain == NSPOSIXErrorDomain && ns.code == 2) { return L10n.text(.folderMissing) }
+        return L10n.format(.openFailed, error.localizedDescription)
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
@@ -412,7 +417,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
             cell.imageView?.contentTintColor = item.isBrowsable ? .systemBlue : .secondaryLabelColor
         case "modified": cell.textField?.stringValue = item.modified.map { dateFormatter.string(from: $0) } ?? "—"
         case "kind": cell.textField?.stringValue = item.kind
-        case "size": cell.textField?.stringValue = item.isDirectory ? "—" : item.size.map { ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) } ?? "—"
+        case "size": cell.textField?.stringValue = item.isDirectory ? "—" : item.size.map { $0.formatted(.byteCount(style: .file).locale(L10n.locale)) } ?? "—"
         default: break
         }
         return cell

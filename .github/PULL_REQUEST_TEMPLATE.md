@@ -1,14 +1,15 @@
-## 変更内容
+## Changes / 変更内容
 
-何が起きていたか、変更後にどう動くかを記載してください。
-関連する要件IDまたはIssue:
+Describe the problem and the behavior after this change.
+Related requirement or Issue / 関連する要件・Issue:
 
-## 確認したこと
+## Verification / 確認したこと
 
-実行したテスト・実機操作と結果、OS／Swiftのバージョンを記載してください。
-UI変更はキーボード操作、ファイル操作は失敗時のデータ保全も確認してください。
-未確認事項は明示してください。
+List tests/manual checks, results, macOS and Swift versions.
+For UI changes, check keyboard operation and English/Japanese layout.
+For file operations, check failure paths and preservation of original data.
+State what remains untested / 未確認事項を明示してください。
 
-## 制約・資料
+## Limitations and documentation / 制約・資料
 
-残る制約、性能への影響、更新した操作説明・設計があれば記載してください。
+Note remaining limitations, performance impact and documentation changes.

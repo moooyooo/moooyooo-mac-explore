@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0 — 2026-09-26 (development; not published)
+
+- Add English/Japanese menus, browser controls, help, errors and accessibility labels.
+- Add language selection, system fallback and a per-process launch override.
+- Localize dates, byte counts and plural messages; adapt the toolbar for long labels.
+- Bundle translations and MIT notices; test both languages in a relocated app.
+- Add translation checks and expanded macOS CI.
+- Prepare public documentation, Issue templates, security policy and synthetic demos.
+- Add verified development ZIPs, SHA-256/build metadata and a notarization path.
+- Preserve project schema version 1 and user-supplied names and paths.
+- Hosted CI, screenshots, notarization and platform/manual qualification remain pending.
+
 ## 0.2.0 — 2026-09-25 (development)
 
 - Add lazy folder trees, breadcrumbs, favorites and shared filesystem monitoring.
