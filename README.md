@@ -6,8 +6,9 @@ A lightweight native macOS file manager with Windows Explorer-inspired controls.
 Arrange multiple Explorer panes inside an MDI window, keep several workspaces open,
 launch independent app processes, and save each workspace as a project.
 
-**0.3.0 development preview.** Browsing and project persistence are implemented.
-File copy, move, rename, trash, drag-and-drop and file-operation Undo are planned.
+**0.4.0 development preview.** Browsing, projects and basic file operations are implemented.
+File operations have synthetic-data and AppKit action tests; manual/Finder and physical
+cross-volume qualification remain open. See [file operations and limits](docs/file-operations.md).
 There is no signed, notarized public release yet.
 
 ## Screenshot
@@ -29,6 +30,8 @@ Actual AppKit window content with synthetic files, captured in English and Japan
 - Project editing locks, detection of outside changes, atomic saves and recovery
   of interrupted workspace configurations.
 - English and Japanese menus, status messages, dialogs and accessibility labels.
+- Create folders, rename, copy/cut/paste, move to Trash, resolve conflicts and undo
+  supported operations. Native file URL drag-and-drop is connected.
 
 ```mermaid
 flowchart TB
@@ -115,8 +118,10 @@ each. [Generate a synthetic sample](examples/README.md) for a clean two-pane wor
 | Save project as | Cmd/Ctrl+Shift+S |
 
 Use the Window menu for keyboard movement and resizing, then arrows, Enter or Esc.
-Edit-menu clipboard commands currently apply to text fields; file operations are
-not implemented. macOS menu-bar focus is Control+F2 (or Fn+Control+F2).
+Create folders with Cmd/Ctrl+Shift+N; rename with F2; use Cmd/Ctrl+C/X/V/Z for
+file copy/cut/paste/Undo. Delete→ or Cmd+Backspace moves selected items to Trash.
+Text fields retain text-editing commands. macOS menu-bar focus is Control+F2
+(or Fn+Control+F2).
 
 ## Verification and limitations
 

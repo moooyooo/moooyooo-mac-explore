@@ -4,8 +4,9 @@
 Windowsのキー動作は[Microsoft公式の一覧](https://support.microsoft.com/en-us/accessibility/windows/keyboard-shortcuts-in-windows)を参照した。
 以下のMDI・プロジェクト用キーとMac上での割当は、このアプリの設計である。
 
-0.2.0では閲覧・MDI・プロジェクトの基本操作を実装済み。ファイル操作、キーの
-プリセット切替、コンテキストメニューの拡充は未実装。表全体は目標仕様を含む。
+0.4.0開発版では閲覧・MDI・プロジェクトに加え、基本ファイル操作、コンテキスト
+メニュー、ファイルURLのDnDを接続した。キーのプリセット切替は未実装。
+表全体は目標仕様を含み、実画面・Finderの検証も残る。
 実装済みのプロジェクト操作は[操作手順](projects.md)を参照。
 
 ## 1. 画面構成

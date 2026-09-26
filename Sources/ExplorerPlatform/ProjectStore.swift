@@ -110,16 +110,20 @@ enum StorageIO {
                             stage: ((FileHandle, Data) throws -> Void)? = nil) throws {
         try checkWritableFile(url)
         guard try existingData(url) == expected else { throw StorageError.externalChange }
+        let access = try expected == nil ? nil : FileAccess.read(at: url)
         let temporary = url.deletingLastPathComponent().appendingPathComponent(".macexplore-\(UUID().uuidString).tmp")
         let descriptor = Darwin.open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
         guard descriptor >= 0 else { throw posixError() }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
         defer { try? handle.close(); try? FileManager.default.removeItem(at: temporary) }
+        if let access { try access.apply(to: descriptor) }
+        else { try FileAccess.makePrivate(descriptor) }
         if let stage { try stage(handle, data) } else { try handle.write(contentsOf: data) }
         try handle.synchronize()
         try handle.close()
         try checkWritableFile(url)
         guard try existingData(url) == expected else { throw StorageError.externalChange }
+        if let access, try !access.matches(FileAccess.read(at: url)) { throw StorageError.externalChange }
         if expected == nil {
             // RENAME_EXCL also closes the race where another app creates the new target.
             guard renamex_np(temporary.path, url.path, UInt32(RENAME_EXCL)) == 0 else {

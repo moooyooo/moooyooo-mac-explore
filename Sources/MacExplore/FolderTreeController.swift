@@ -13,8 +13,20 @@ private final class FolderNode {
 }
 
 @MainActor
+final class FolderOutlineView: NSOutlineView {
+    var onContextMenu: (() -> NSMenu)?
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let row = row(at: convert(event.locationInWindow, from: nil))
+        if row < 0 { deselectAll(nil) }
+        else if !selectedRowIndexes.contains(row) { selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
+        window?.makeFirstResponder(self)
+        return onContextMenu?()
+    }
+}
+
+@MainActor
 final class FolderTreeController: NSViewController, NSOutlineViewDataSource, NSOutlineViewDelegate {
-    let outline = NSOutlineView()
+    let outline = FolderOutlineView()
     private let scroll = NSScrollView()
     private var roots: [FolderNode] = []
     private var expanded: Set<URL> = []
@@ -23,6 +35,7 @@ final class FolderTreeController: NSViewController, NSOutlineViewDataSource, NSO
     private var reloading = false
     var onNavigate: ((URL) -> Void)?
     var onExpandedChange: (([URL]) -> Void)?
+    var selectedURL: URL? { (outline.item(atRow: outline.selectedRow) as? FolderNode)?.url }
 
     override func loadView() {
         view = scroll

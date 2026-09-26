@@ -100,6 +100,9 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     private let number: Int
 
     var activeBrowser: ExplorerBrowserController? { state.activePaneID.flatMap { browsers[$0] } }
+    weak var fileOperations: FileOperationController? {
+        didSet { for browser in browsers.values { browser.fileOperations = fileOperations } }
+    }
     var isLoadingDirectories: Bool { browsers.values.contains { $0.loading } }
     var canvasSize: CanvasSize { CanvasSize(width: canvas.bounds.width, height: canvas.bounds.height) }
 
@@ -170,6 +173,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     private func installPane(_ model: ExplorerPane, settings: BrowserSettings) {
         let id = model.id
         let browser = ExplorerBrowserController(paneID: id, directory: model.directory, settings: settings)
+        browser.fileOperations = fileOperations
         browsers[id] = browser
         browser.onLoadFinished = { [weak self] in self?.onDirectoryLoaded?() }
         browser.onLocationChange = { [weak self] url in
@@ -219,6 +223,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     func closeActivePane() { if let id = state.activePaneID { closePane(id) } }
 
     func closePane(_ id: UUID) {
+        if fileOperations?.isBusy == true { fileOperations?.explainPendingOperation(in: window); return }
         finishGeometry()
         browsers[id]?.stop()
         browsers.removeValue(forKey: id)
@@ -440,6 +445,10 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
+        if fileOperations?.isBusy == true {
+            fileOperations?.explainPendingOperation(in: sender)
+            return false
+        }
         if closeApproved { return true }
         guard let project else { return true }
         Task { [weak self] in

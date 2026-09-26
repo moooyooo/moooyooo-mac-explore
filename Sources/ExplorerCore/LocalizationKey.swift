@@ -147,7 +147,67 @@ extension L10n {
         case languageJapanese
         case languageNextLaunch
         case languageNextLaunchDetail
+        case invalidItemName
+        case invalidOperationLocation
+        case fileOperationBusy
+        case fileOperationConflict
+        case fileOperationSourceChanged
+        case fileOperationDestinationChanged
+        case fileOperationInsideSource
+        case fileOperationUnsupported
+        case fileUndoChanged
+        case fileUndoUnavailable
+        case copiedItemName
+        case moveCopyRetained
+        case operationOriginalRetained
+        case replacementBackupRetained
         case itemCount
+        case trashedWithoutUndo
+        case fileCommittedWarning
+        case retainedOperationsMenu
+        case retainedOperationsDetail
+        case noRetainedOperations
+        case revealRetainedOperations
+        case cutRequestUnavailable
+        case cutRequestChanged
+        case newFolder
+        case renameItem
+        case moveToTrash
+        case copyPath
+        case itemName
+        case createItem
+        case renameAction
+        case newFolderPrompt
+        case renamePrompt
+        case copyingFiles
+        case cuttingFiles
+        case movingFiles
+        case trashingFiles
+        case undoingFiles
+        case preparingFiles
+        case fileProgress
+        case cancellingFiles
+        case fileOperationFailed
+        case fileOperationResults
+        case fileResultCounts
+        case fileOperationCancelled
+        case fileConflictTitle
+        case fileConflictDetail
+        case folderConflictDetail
+        case replaceItem
+        case skipItem
+        case keepBoth
+        case trashConfirm
+        case trashConfirmDetail
+        case clipboardCopyStatus
+        case clipboardCutStatus
+        case foreignClipboardCopy
+        case fileOperationWait
+        case fileOperationWaitDetail
+        case showFileProgress
+        case cancelFileOperation
+        case contextOpen
+        case clipboardUnavailable
         case selectedCount
         case windowCount
     }

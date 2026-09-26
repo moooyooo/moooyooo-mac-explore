@@ -32,6 +32,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     private var workspaceObserver: NSObjectProtocol?
     private var recoveryErrorShown = false
     private var instanceArguments: [String] = []
+    private var fileOperations = FileOperationController()
 
     init(startTime: TimeInterval) { self.startTime = startTime }
 
@@ -67,7 +68,9 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
             instanceArguments = ["--support-directory", supportDirectory.path]
             projectStore = ProjectStore(supportDirectory: supportDirectory)
             recentStore = RecentProjectStore(supportDirectory: supportDirectory)
+            fileOperations = FileOperationController(supportDirectory: supportDirectory)
         }
+        fileOperations.onChange = { [weak self] in self?.windows.forEach { $0.reloadBrowsers() } }
         if let language = LanguageSettings.argument() { instanceArguments += ["--language", language.rawValue] }
         let session = SessionStore(instanceID: instanceID, supportDirectory: supportDirectory)
         sessionStore = session
@@ -89,6 +92,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
             Task { @MainActor in self?.windows.forEach { $0.reloadBrowsers() } }
         }
         NSApp.activate(ignoringOtherApps: true)
+        Task { await fileOperations.showRetainedOperations(in: current?.window, onlyIfPresent: true) }
         #if DEBUG
         if let index = arguments.firstIndex(of: "--capture-window"), arguments.indices.contains(index + 1) {
             WindowCapture.start(to: URL(fileURLWithPath: arguments[index + 1]), workspace: { [weak self] in
@@ -115,6 +119,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
             openProject: { [weak self] in self?.chooseProject(switching: false) }
         )
         let project = WorkspaceProjectController(workspace: controller, store: projectStore)
+        controller.fileOperations = fileOperations
         controller.project = project
         project.onChange = { [weak self] in self?.scheduleRecovery() }
         project.onSaved = { [weak self] url in self?.recordRecent(url) }
@@ -150,6 +155,10 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if fileOperations.isBusy {
+            fileOperations.explainPendingOperation(in: current?.window)
+            return .terminateCancel
+        }
         guard !terminating else { return .terminateCancel }
         guard !windows.contains(where: { $0.project?.isBusy == true || $0.window?.attachedSheet != nil }) else { return .terminateCancel }
         terminating = true
@@ -189,7 +198,16 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
 
     func perform(_ command: AppCommand) {
         guard !terminating else { return }
+        if let selector = textSelector(for: command), let editor = NSApp.keyWindow?.firstResponder as? NSTextView, editor.isEditable {
+            _ = NSApp.sendAction(NSSelectorFromString(selector), to: editor, from: nil)
+            return
+        }
         switch command {
+        case .recoverFileOperations: Task { await fileOperations.showRetainedOperations(in: current?.window) }
+        case .newFolder, .renameItem, .trashFiles, .copyFiles, .cutFiles, .pasteFiles, .undoFiles, .copyPath:
+            fileOperations.perform(command, in: current?.activeBrowser)
+        case .contextMenu: current?.activeBrowser?.showContextMenu()
+        case .selectAll: current?.activeBrowser?.table.selectAll(nil)
         case .newPane: if let current { current.addPane() } else { createWindow() }
         case .newWindow: createWindow()
         case .newInstance: launchInstance()
@@ -233,7 +251,13 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         }
         if (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true { return false }
         guard let command = AppCommand(rawValue: menuItem.tag) else { return true }
+        if textSelector(for: command) != nil, let editor = NSApp.keyWindow?.firstResponder as? NSTextView, editor.isEditable {
+            return command != .undoFiles || editor.undoManager?.canUndo == true
+        }
         switch command {
+        case .recoverFileOperations: return !terminating && !fileOperations.isBusy
+        case .newFolder, .renameItem, .trashFiles, .copyFiles, .cutFiles, .pasteFiles, .undoFiles, .copyPath:
+            return !terminating && fileOperations.canPerform(command, in: current?.activeBrowser)
         case .newPane, .newWindow, .newInstance, .shortcuts, .diagnostics, .openProject, .recoverSession: return !terminating
         case .saveProject, .saveProjectAs, .switchProject: return current != nil && current?.project?.isBusy == false
         case .reacquireProject: return current?.project?.opened != nil && current?.project?.isBusy == false
@@ -241,6 +265,17 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         case .openFolder, .closeWindow: return current != nil
         case .nextPane, .previousPane, .columns, .rows, .cascade: return current?.state.panes.isEmpty == false
         default: return current?.state.activePaneID != nil
+        }
+    }
+
+    private func textSelector(for command: AppCommand) -> String? {
+        switch command {
+        case .undoFiles: "undo:"
+        case .cutFiles: "cut:"
+        case .copyFiles: "copy:"
+        case .pasteFiles: "paste:"
+        case .selectAll: "selectAll:"
+        default: nil
         }
     }
 
@@ -308,6 +343,10 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         file.addItem(.separator())
         add(file, L10n.text(.chooseFolder), .openFolder, "o", [.command, .shift])
         add(file, L10n.text(.openSelectionInPane), .openInNewPane)
+        add(file, L10n.text(.newFolder), .newFolder, "n", [.command, .shift])
+        add(file, L10n.text(.renameItem), .renameItem, "\u{f705}", [])
+        add(file, L10n.text(.moveToTrash), .trashFiles, "\u{8}")
+        add(file, L10n.text(.retainedOperationsMenu), .recoverFileOperations)
         file.addItem(.separator())
         add(file, L10n.text(.closeExplorer), .closePane, "w")
         add(file, L10n.text(.closeMDIWindow), .closeWindow, "w", [.command, .shift])
@@ -328,9 +367,13 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         add(project, L10n.text(.recoverSession), .recoverSession)
 
         let edit = menu(L10n.text(.menuEdit))
-        for (title, selector, key) in [(L10n.text(.undo), "undo:", "z"), (L10n.text(.cut), "cut:", "x"), (L10n.text(.copy), "copy:", "c"), (L10n.text(.paste), "paste:", "v"), (L10n.text(.selectAll), "selectAll:", "a")] {
-            edit.addItem(withTitle: title, action: NSSelectorFromString(selector), keyEquivalent: key)
-        }
+        add(edit, L10n.text(.undo), .undoFiles, "z")
+        edit.addItem(.separator())
+        add(edit, L10n.text(.cut), .cutFiles, "x")
+        add(edit, L10n.text(.copy), .copyFiles, "c")
+        add(edit, L10n.text(.paste), .pasteFiles, "v")
+        add(edit, L10n.text(.selectAll), .selectAll, "a")
+        add(edit, L10n.text(.copyPath), .copyPath)
         let view = menu(L10n.text(.menuView))
         add(view, L10n.text(.refresh), .refresh, "r")
         add(view, L10n.text(.searchFolder), .focusSearch, "f")

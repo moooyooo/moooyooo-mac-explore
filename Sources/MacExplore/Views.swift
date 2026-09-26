@@ -40,6 +40,17 @@ final class ActionButton: NSButton {
 final class FileTableView: NSTableView {
     var onOpen: (() -> Void)?
     var onBack: (() -> Void)?
+    var onContextMenu: (() -> NSMenu)?
+
+    override func wantsPeriodicDraggingUpdates() -> Bool { true }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let row = row(at: convert(event.locationInWindow, from: nil))
+        if row < 0 { deselectAll(nil) }
+        else if !selectedRowIndexes.contains(row) { selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
+        window?.makeFirstResponder(self)
+        return onContextMenu?()
+    }
 
     override func keyDown(with event: NSEvent) {
         let flags = event.modifierFlags.intersection([.command, .control, .option, .shift])

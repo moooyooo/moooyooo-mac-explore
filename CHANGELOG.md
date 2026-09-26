@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0 — in development (not published)
+
+- Add folder creation, rename, file/folder copy and move, Trash, and bounded process-local Undo.
+- Add Explorer shortcuts, selection/empty-area context menus and native file URL drag-and-drop.
+- Add conflict choices (replace, skip, keep both), progress, file-boundary cancellation and partial-result reports.
+- Coordinate mutations and clipboard Cut requests across processes with durable claims and kernel locks.
+- Preserve staged originals after interrupted moves and expose retained data through a recovery menu.
+- Preserve existing project ACLs during saves and remove inherited permissions from private new files.
+- Extend English/Japanese UI and add integrity, concurrent-process and native AppKit action tests.
+- Finder, physical cross-volume, manual input, accessibility and release qualification remain open.
+
 ## 0.3.0 — 2026-09-26 (development; not published)
 
 - Add English/Japanese menus, browser controls, help, errors and accessibility labels.

@@ -3,13 +3,33 @@ import ExplorerCore
 import ExplorerPlatform
 
 @MainActor
-final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate {
+final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate, NSMenuItemValidation {
     let paneID: UUID
     private(set) var directory: URL
     var onLocationChange: ((URL) -> Void)?
     var onLoadFinished: (() -> Void)?
     var onSettingsChange: (() -> Void)?
     var onOpenInNewPane: ((URL) -> Void)?
+    weak var fileOperations: FileOperationController?
+    private var pendingSelection: Set<String>?
+    private let dropPlanner = FileDropPlanner()
+    private struct DropRequest: Equatable {
+        let sources: [URL]
+        let destination: URL
+        let requested: FileTransferKind?
+        let sequence: Int
+    }
+    private var dropRequest: DropRequest?
+    private var dropKind: FileTransferKind?
+    private var dropTask: Task<Void, Never>?
+    var selectedURLs: [URL] {
+        if view.window?.firstResponder === tree.outline { return tree.selectedURL.map { [$0] } ?? [] }
+        guard !loading else { return [] }
+        return table.selectedRowIndexes.compactMap { visibleEntries.indices.contains($0) ? visibleEntries[$0].url : nil }
+    }
+    var operationDirectory: URL {
+        view.window?.firstResponder === tree.outline ? tree.selectedURL ?? directory : directory
+    }
     private var settings: BrowserSettings
     private var history = NavigationHistory()
     private var entries: [FileEntry] = []
@@ -57,7 +77,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    deinit { loadTask?.cancel(); projectionTask?.cancel(); watchTask?.cancel(); refreshTask?.cancel() }
+    deinit { loadTask?.cancel(); projectionTask?.cancel(); watchTask?.cancel(); refreshTask?.cancel(); dropTask?.cancel() }
 
     override func loadView() {
         view = root
@@ -117,6 +137,10 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         table.doubleAction = #selector(openSelected)
         table.onOpen = { [weak self] in self?.openSelected() }
         table.onBack = { [weak self] in self?.goBack() }
+        table.onContextMenu = { [weak self] in self?.contextMenu() ?? NSMenu() }
+        table.registerForDraggedTypes([.fileURL])
+        table.setDraggingSourceOperationMask([.copy, .move], forLocal: true)
+        table.setDraggingSourceOperationMask([.copy, .move], forLocal: false)
         table.setAccessibilityLabel(L10n.text(.fileList))
         table.sortDescriptors = [NSSortDescriptor(key: settings.sortColumn.rawValue, ascending: settings.ascending)]
         scroll.documentView = table
@@ -137,6 +161,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         addChild(tree)
         root.addSubview(tree.view)
         tree.onNavigate = { [weak self] url in self?.navigate(to: url) }
+        tree.outline.onContextMenu = { [weak self] in self?.contextMenu() ?? NSMenu() }
         tree.onExpandedChange = { [weak self] urls in self?.settings.expandedDirectories = urls; self?.onSettingsChange?() }
         tree.configure(expanded: settings.expandedDirectories, favorites: settings.favorites, showHidden: settings.showHidden)
         divider.wantsLayer = true
@@ -233,6 +258,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         projectionTask?.cancel(); projectionTask = nil
         watchTask?.cancel(); watchTask = nil
         refreshTask?.cancel(); refreshTask = nil
+        dropTask?.cancel(); dropTask = nil; dropRequest = nil; dropKind = nil
         watchedURL = nil; tree.stop()
     }
     func reload() { navigate(to: directory, via: history.current == nil ? .visit : .reload) }
@@ -257,6 +283,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     }
 
     func openSelectionInNewPane() {
+        if view.window?.firstResponder === tree.outline, let url = tree.selectedURL { onOpenInNewPane?(url); return }
         guard visibleEntries.indices.contains(table.selectedRow), visibleEntries[table.selectedRow].isBrowsable else { return }
         onOpenInNewPane?(visibleEntries[table.selectedRow].url)
     }
@@ -292,6 +319,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     }
 
     @objc func openSelected() {
+        if view.window?.firstResponder === tree.outline, let url = tree.selectedURL { navigate(to: url); return }
         guard !loading, visibleEntries.indices.contains(table.selectedRow) else { return }
         let item = visibleEntries[table.selectedRow]
         if item.isBrowsable { navigate(to: item.url) }
@@ -315,7 +343,10 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
                   let self, self.projectionGeneration == request else { return }
             self.visibleEntries = result
             self.table.reloadData()
-            self.table.selectRowIndexes(IndexSet(result.indices.filter { selection.contains(result[$0].url) }), byExtendingSelection: false)
+            let pending = self.pendingSelection
+            self.pendingSelection = nil
+            self.table.selectRowIndexes(IndexSet(result.indices.filter { pending?.contains(result[$0].name) ?? selection.contains(result[$0].url) }), byExtendingSelection: false)
+            if pending != nil, self.table.selectedRow >= 0 { self.table.scrollRowToVisible(self.table.selectedRow) }
             self.updateStatus()
             self.onLoadFinished?()
         }
@@ -330,7 +361,112 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         status.textColor = errorMessage == nil ? .secondaryLabelColor : .systemRed
     }
 
+    func selectAfterReload(_ urls: [URL]) {
+        pendingSelection = Set(urls.filter {
+            $0.deletingLastPathComponent().resolvingSymlinksInPath() == directory.resolvingSymlinksInPath()
+        }.map(\.lastPathComponent))
+        reload()
+    }
+
+    func showOperationStatus(_ message: String) {
+        status.stringValue = message
+        status.toolTip = message
+        status.textColor = .secondaryLabelColor
+    }
+
+    func contextMenu() -> NSMenu {
+        let menu = NSMenu()
+        func add(_ key: L10n.Key, _ command: AppCommand, keyEquivalent: String = "") {
+            let item = NSMenuItem(title: L10n.text(key), action: #selector(contextCommand(_:)), keyEquivalent: keyEquivalent)
+            item.target = self; item.tag = command.rawValue
+            menu.addItem(item)
+        }
+        if !selectedURLs.isEmpty {
+            let open = NSMenuItem(title: L10n.text(.contextOpen), action: #selector(openSelected), keyEquivalent: "")
+            open.target = self; menu.addItem(open)
+            add(.openSelectionInPane, .openInNewPane)
+            menu.addItem(.separator())
+            add(.cut, .cutFiles, keyEquivalent: "x")
+            add(.copy, .copyFiles, keyEquivalent: "c")
+            add(.copyPath, .copyPath)
+            add(.renameItem, .renameItem)
+            add(.moveToTrash, .trashFiles)
+            menu.addItem(.separator())
+        }
+        add(.paste, .pasteFiles, keyEquivalent: "v")
+        add(.newFolder, .newFolder)
+        add(.undo, .undoFiles, keyEquivalent: "z")
+        menu.addItem(.separator())
+        add(.refresh, .refresh)
+        return menu
+    }
+
+    @objc private func contextCommand(_ sender: NSMenuItem) {
+        guard let command = AppCommand(rawValue: sender.tag) else { return }
+        if command == .refresh { reload() }
+        else if command == .openInNewPane { openSelectionInNewPane() }
+        else { fileOperations?.perform(command, in: self) }
+    }
+
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        guard item.action == #selector(contextCommand(_:)), let command = AppCommand(rawValue: item.tag) else { return !selectedURLs.isEmpty }
+        if command == .refresh { return true }
+        if command == .openInNewPane {
+            if view.window?.firstResponder === tree.outline { return tree.selectedURL != nil }
+            return selectedURLs.count == 1 && visibleEntries.contains { $0.url == selectedURLs.first && $0.isBrowsable }
+        }
+        return fileOperations?.canPerform(command, in: self) == true
+    }
+
+    func showContextMenu() {
+        let target: NSTableView = view.window?.firstResponder === tree.outline ? tree.outline : table
+        let rect = target.rect(ofRow: max(0, target.selectedRow))
+        contextMenu().popUp(positioning: nil, at: NSPoint(x: 30, y: rect.midY), in: target)
+    }
+
     func numberOfRows(in tableView: NSTableView) -> Int { visibleEntries.count }
+    func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
+        guard !loading, visibleEntries.indices.contains(row) else { return nil }
+        return visibleEntries[row].url as NSURL
+    }
+
+    private func requestForDrop(_ info: NSDraggingInfo, row: Int, operation: NSTableView.DropOperation) -> DropRequest {
+        let target = operation == .on && visibleEntries.indices.contains(row) && visibleEntries[row].isBrowsable
+            ? visibleEntries[row].url : directory
+        let flags = NSEvent.modifierFlags
+        let requested: FileTransferKind? = flags.contains(.option) ? .copy : flags.contains(.shift) ? .move : nil
+        return DropRequest(sources: FileOperationController.clipboardURLs(info.draggingPasteboard),
+                           destination: target, requested: requested, sequence: info.draggingSequenceNumber)
+    }
+
+    func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int,
+                   proposedDropOperation operation: NSTableView.DropOperation) -> NSDragOperation {
+        guard !loading, fileOperations?.isBusy == false else { return [] }
+        let request = requestForDrop(info, row: row, operation: operation)
+        if request.destination == directory { tableView.setDropRow(-1, dropOperation: .on) }
+        if request != dropRequest {
+            dropTask?.cancel(); dropKind = nil; dropRequest = request
+            let planner = dropPlanner
+            dropTask = Task { [weak self] in
+                let kind = try? await planner.plan(request.sources, to: request.destination, requested: request.requested)
+                guard !Task.isCancelled, let self, self.dropRequest == request else { return }
+                self.dropKind = kind
+            }
+        }
+        guard let kind = dropKind else { return [] }
+        let operation: NSDragOperation = kind == .move ? .move : .copy
+        return info.draggingSourceOperationMask.contains(operation) ? operation : []
+    }
+
+    func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int,
+                   dropOperation operation: NSTableView.DropOperation) -> Bool {
+        let request = requestForDrop(info, row: row, operation: operation)
+        guard request == dropRequest, let kind = dropKind, fileOperations?.isBusy == false,
+              info.draggingSourceOperationMask.contains(kind == .move ? .move : .copy) else { return false }
+        fileOperations?.transfer(request.sources, to: request.destination, kind: kind, browser: self)
+        dropRequest = nil; dropKind = nil; dropTask = nil
+        return true
+    }
     func tableViewSelectionDidChange(_ notification: Notification) { updateStatus() }
     func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
         guard !configuring else { return }
