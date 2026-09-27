@@ -13,15 +13,16 @@ and supported-OS qualification remain incomplete.
 - [x] Synthetic sample generator and screenshot instructions.
 - [x] Review and capture English/Japanese window content using synthetic files.
 - [x] Draft development release notes and configure retention of verified CI artifacts.
-- [ ] Confirm upstream `moooyooo/moooyooo-mac-explore` and approve publication.
+- [x] Confirm upstream `moooyooo/moooyooo-mac-explore` and approve publication.
 - [x] Review source/history for known private-data patterns and inspect screenshot metadata.
-- [ ] Create upstream and enable/verify private vulnerability reporting.
+- [x] Create upstream and enable/verify private vulnerability reporting.
 - [ ] Push the reviewed branch, run CI on macOS 14/26 and record results.
 
-No remote was configured during this preparation. GitHub authentication has been
-checked as moooyooo. On 2026-09-26, the proposed repository did not resolve through
-the authenticated GitHub CLI. Repository creation and public push are separate
-publication actions.
+The maintainer authorized public source publication on 2026-09-27. The upstream is
+[moooyooo/moooyooo-mac-explore](https://github.com/moooyooo/moooyooo-mac-explore),
+with `main` as its default branch and `origin` as the local remote.
+Private vulnerability reporting, secret scanning and push protection are enabled.
+The [P6 verification record](p6-verification.md) tracks publication and hosted CI.
 
 ## Local verification
 
@@ -38,7 +39,9 @@ git diff --check
 Verification checks bundle metadata, translations, notices, architecture, code
 signature and accidental developer home paths. Relocated-app tests check that the
 app loads its own translations. Integration tests need a macOS GUI session.
-The CI workflow includes them but has not run on GitHub yet. The test wrapper also requires a successful final Swift Testing total; exit status 0 alone is not a passing run.
+The [CI workflow](https://github.com/moooyooo/moooyooo-mac-explore/actions/workflows/ci.yml)
+includes them. The test wrapper also requires a successful final Swift Testing total;
+exit status 0 alone is not a passing run.
 See [GitHub's runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 
 Run `scripts/benchmark-ui.sh` separately on the reference Mac with a GUI session.
@@ -75,7 +78,7 @@ shasum -a 256 -c Moooyooo-Mac-Explore-0.6.0-arm64-dev.sha256
 
 ## Retrieve CI artifacts
 
-After the upstream is created and a workflow succeeds, open **Actions → macOS build
+After a workflow succeeds, open **Actions → macOS build
 and test → the run → Artifacts**. Each matrix job uploads
 `development-<runner OS>-<architecture>` containing the development ZIP, checksum
 and build record. The retention period is 14 days. Sign in to GitHub to download

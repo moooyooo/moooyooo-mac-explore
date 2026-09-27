@@ -5,15 +5,10 @@ there is no supported stable release yet.
 
 ## Report privately
 
-The planned upstream is `moooyooo/moooyooo-mac-explore`. Before the first public
-release, the maintainer must enable **Private vulnerability reporting** on GitHub.
-Once enabled, use **Security → Advisories → Report a vulnerability** in the upstream
-repository. See [GitHub's reporting setup](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/configure-for-a-repository).
-
-**Current status: no upstream repository or private reporting endpoint has been
-set up by this project yet.** Until it is enabled, contact moooyooo through an
-existing private channel. Do not publish sensitive exploit details in an Issue.
-Activation and verification of the reporting endpoint is a source-publication gate.
+Use [Report a vulnerability](https://github.com/moooyooo/moooyooo-mac-explore/security/advisories/new)
+in the upstream repository, or choose **Security → Advisories → Report a vulnerability**.
+Private vulnerability reporting was enabled and verified on 2026-09-27.
+Do not publish sensitive exploit details in an Issue.
 
 Include the app version/commit, macOS version, impact, and minimal reproduction
 steps using synthetic files. Do not attach credentials, signing keys, private file

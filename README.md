@@ -2,6 +2,8 @@
 
 [日本語](README.ja.md) · [Changelog](CHANGELOG.md) · [Roadmap](docs/roadmap.en.md)
 
+[![CI](https://github.com/moooyooo/moooyooo-mac-explore/actions/workflows/ci.yml/badge.svg)](https://github.com/moooyooo/moooyooo-mac-explore/actions/workflows/ci.yml)
+
 A lightweight native macOS file manager with Windows Explorer-inspired controls.
 Arrange multiple Explorer panes inside an MDI window, keep several workspaces open,
 launch independent app processes, and save each workspace as a project.
@@ -60,14 +62,17 @@ reload and acquire editing access after the existing owner closes it.
 - Python 3 for repository validation and synthetic fixtures.
 
 Local verification uses macOS 26.5, Apple M2 Max and Swift 6.3.2 with Command Line
-Tools. CI is configured for macOS 14 and 26, but has not run on GitHub yet.
+Tools. CI targets macOS 14 and 26; see the [workflow results](https://github.com/moooyooo/moooyooo-mac-explore/actions/workflows/ci.yml)
+and [publication verification](docs/p6-verification.md) for its current status.
 Builds contain the host architecture, not a universal binary.
 
 ## Build and run
 
-From the repository root:
+Clone the source, then run from the repository root:
 
 ```sh
+git clone https://github.com/moooyooo/moooyooo-mac-explore.git
+cd moooyooo-mac-explore
 python3 scripts/check-localizations.py
 scripts/build-app.sh release
 scripts/test.sh --integration

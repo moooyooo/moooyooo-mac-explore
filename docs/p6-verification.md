@@ -1,5 +1,7 @@
 # 多言語対応とP6の実装・検証
 
+最新の公開状況は末尾の「GitHubソース公開」を参照。以下の過去記録は当時の状態を保持する。
+
 更新日: 2026-09-26。バージョン0.3.0の開発版。P6全体は進行中。
 
 以下は0.3.0公開準備時点の記録。0.4.0のファイル操作とACL保全の追加検証は
@@ -105,3 +107,22 @@ CI定義に専用APFSイメージでの容量不足・移動の試験を追加�
 [0.6.0リリースノート案](releases/0.6.0.md)と[TODO・ISSUE・ブロッカー](backlog.md)を追加。
 Git remoteは未設定で公開操作は行っていない。2026-09-27の署名ID再確認も有効なIDは0件。
 公開先への承認、実CI、署名公証、実環境での受け入れ確認が残る。
+
+## GitHubソース公開（2026-09-27）
+
+ユーザーの公開指示を受け、[moooyooo/moooyooo-mac-explore](https://github.com/moooyooo/moooyooo-mac-explore)
+をPublicで作成した。参考にした`moooyooo-local-llm-harness`と同様に、MIT・既定ブランチ
+`main`・Issues有効・Wiki無効とし、日英READMEから画面・ビルド手順・CIへ案内する。
+
+- 公開前の全10コミット・268個の固有ファイル内容とコミット情報を再検査。
+  個人ホームパス・ローカルアカウント名・秘密鍵・代表的なトークン形式の該当なし。
+  これはパターン検査の結果であり、あらゆる秘密情報や脆弱性の不存在を保証するものではない。
+- 作成者・コミッターはすべて`moooyooo`とGitHub公開用noreplyメール。
+- `origin`を登録し、既存履歴を改変せず`main`へfast-forwardで集約。
+- 非公開の脆弱性報告をAPIで有効化し、`enabled: true`を再取得して確認。
+  `SECURITY.md`とIssue選択画面から報告先へリンクした。
+- Secret scanning・push protectionを有効化し、設定結果を確認。
+- 翻訳236キーとテスト終了検出の3試験を再確認。アプリコードは検証済み`270bc85`から変更なし。
+
+初回のpushと[macOS 14/26 CI](https://github.com/moooyooo/moooyooo-mac-explore/actions/workflows/ci.yml)
+の結果を確認中。タグ・GitHub Release・一般利用向けバイナリ配布は今回のソース公開に含めない。

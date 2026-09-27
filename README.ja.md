@@ -2,6 +2,8 @@
 
 [English](README.md) · [多言語対応](docs/localization.md) · [P6の進捗](docs/p6-verification.md)
 
+[![CI](https://github.com/moooyooo/moooyooo-mac-explore/actions/workflows/ci.yml/badge.svg)](https://github.com/moooyooo/moooyooo-mac-explore/actions/workflows/ci.yml)
+
 A lightweight native macOS file manager with Windows Explorer-inspired controls,
 multiple MDI workspaces, independent app processes, and saved projects.
 
@@ -43,7 +45,7 @@ Finder連携と物理的な外部ドライブ・ネットワークでの検証�
 
 2026-09-25に初期仕様を整理しました。プロジェクト名は仮称です。
 管理者・GitHubユーザー名は **[moooyooo](https://github.com/moooyooo)** です。
-GitHubへの公開は今後の工程に含みます。
+ソースは[moooyooo/moooyooo-mac-explore](https://github.com/moooyooo/moooyooo-mac-explore)で開発版として公開します。
 
 ## 目指す使い方
 
@@ -111,6 +113,8 @@ VoiceOver使用中はControl+OptionとCaps Lockの組み合わせをVoiceOverへ
 Swift 6系とmacOS SDKが必要です。Command Line Toolsのみでもビルドできます。
 
 ```sh
+git clone https://github.com/moooyooo/moooyooo-mac-explore.git
+cd moooyooo-mac-explore
 python3 scripts/check-localizations.py
 scripts/build-app.sh release
 scripts/test.sh --integration
@@ -143,7 +147,8 @@ Xcodeを選択している環境では通常のSwiftPM設定を利用します�
 初期確認環境はmacOS 26.5 / Apple Silicon / Swift 6.3.2 / Command Line Toolsです。
 現在選択されている開発者ディレクトリはCommand Line Toolsです。
 GitHub Actions用にmacOS 14/26での実アプリ検証・Releaseビルド・アーカイブ検証を定義しています。
-GitHubへまだpushしていないため、CI上での結果は未確認です。
+実行状況は[GitHub Actions](https://github.com/moooyooo/moooyooo-mac-explore/actions/workflows/ci.yml)、
+公開時の確認結果は[P6の記録](docs/p6-verification.md)を参照してください。
 
 ### Performance tools
 
@@ -168,6 +173,7 @@ scripts/test-volumes.sh
 ライセンスは[MIT](LICENSE)です。英語README・Issueテンプレート・配布スクリプトを追加しました。
 指定により、多言語対応を先に実装してP6の公開準備を進めています。
 日英・明暗の画面キャプチャと[0.6.0のリリースノート案](docs/releases/0.6.0.md)を用意しました。
-GitHub公開先・CI実行、Developer ID署名・公証は残作業です。
+Publicリポジトリと非公開の脆弱性報告窓口を作成しました。CIの結果を確認し、
+一般配布に向けてDeveloper ID署名・公証と実環境での検証を進めます。
 作業の内訳とユーザー側で必要な対応は[TODO・ISSUE・ブロッカー](docs/backlog.md)にまとめています。
 検証条件は[配布手順](docs/releasing.md)と[P6の記録](docs/p6-verification.md)を参照してください。
