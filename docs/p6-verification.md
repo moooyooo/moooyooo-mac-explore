@@ -132,4 +132,8 @@ GitHubのsecret scanningでは確認時点の未解決警告は0件。
 ビルド開始時に失敗した。インストール済みのXcode 16.2を明示する設定へ修正し、再確認する。
 使用可能なXcodeは[GitHub公式ランナー一覧](https://github.com/actions/runner-images/blob/macos-14-arm64/20260831.0302/images/macos/macos-14-arm64-Readme.md)で確認した。
 
+Swift 6.0.3での再ビルドでは、古いSDKの`mach_task_self_`に並行処理の注釈がないことも確認した。
+読み取り専用のメモリ計測コードでDarwinを`@preconcurrency`としてimportする互換対応を追加する。
+現行SDKはこのプロセス固有ポートに`nonisolated(unsafe)`を付与している。計測処理自体は変更しない。
+
 タグ・GitHub Release・一般利用向けバイナリ配布は今回のソース公開に含めない。

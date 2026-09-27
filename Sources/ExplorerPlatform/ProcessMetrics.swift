@@ -1,4 +1,5 @@
-import Darwin
+// Older SDKs lack Swift concurrency annotations for Mach's process-local task port.
+@preconcurrency import Darwin
 import Foundation
 
 public enum ProcessMetrics {
