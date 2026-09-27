@@ -18,7 +18,9 @@ struct WorkspaceRestorationTests {
     }
 
     private func descendants(_ view: NSView) -> [NSView] {
-        [view] + view.subviews.flatMap(descendants)
+        var result = [view]
+        for child in view.subviews { result.append(contentsOf: descendants(child)) }
+        return result
     }
 
     private func click(_ title: String, in view: NSView) throws {
@@ -54,7 +56,11 @@ struct WorkspaceRestorationTests {
         second.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
         let selected = second.selectedURLs
         func items(_ menu: NSMenu) -> [NSMenuItem] {
-            menu.items + menu.items.flatMap { $0.submenu.map(items) ?? [] }
+            var result = menu.items
+            for item in menu.items {
+                if let submenu = item.submenu { result.append(contentsOf: items(submenu)) }
+            }
+            return result
         }
         func invokeContext(_ command: AppCommand) throws -> NSMenuItem {
             second.focusFiles()

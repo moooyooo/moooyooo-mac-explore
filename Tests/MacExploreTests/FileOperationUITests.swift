@@ -19,7 +19,9 @@ struct FileOperationUITests {
     }
 
     private func descendants(_ view: NSView) -> [NSView] {
-        [view] + view.subviews.flatMap(descendants)
+        var result = [view]
+        for child in view.subviews { result.append(contentsOf: descendants(child)) }
+        return result
     }
 
     private func invoke(_ command: AppCommand, browser: ExplorerBrowserController) throws {
