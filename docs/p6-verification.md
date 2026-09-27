@@ -133,7 +133,10 @@ GitHubのsecret scanningでは確認時点の未解決警告は0件。
 使用可能なXcodeは[GitHub公式ランナー一覧](https://github.com/actions/runner-images/blob/macos-14-arm64/20260831.0302/images/macos/macos-14-arm64-Readme.md)で確認した。
 
 Swift 6.0.3での再ビルドでは、古いSDKの`mach_task_self_`に並行処理の注釈がないことも確認した。
-読み取り専用のメモリ計測コードでDarwinを`@preconcurrency`としてimportする互換対応を追加する。
+読み取り専用のメモリ計測コードでDarwinを`@preconcurrency`としてimportする互換対応を追加し、
+古いSDKでのコンパイル通過を確認した。
 現行SDKはこのプロセス固有ポートに`nonisolated(unsafe)`を付与している。計測処理自体は変更しない。
+続いてSwift 6.0.3がフォルダツリー解放の再帰関数を`forEach`へ渡す箇所を誤ってthrowingと推論したため、
+同じ解放順序の`for`ループに置き換えた。
 
 タグ・GitHub Release・一般利用向けバイナリ配布は今回のソース公開に含めない。

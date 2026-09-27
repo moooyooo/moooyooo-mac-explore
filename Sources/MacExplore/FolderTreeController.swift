@@ -132,7 +132,7 @@ final class FolderTreeController: NSViewController, NSOutlineViewDataSource, NSO
         func release(_ node: FolderNode) {
             node.task?.cancel(); node.task = nil
             if let url = node.url { expanded.remove(url) }
-            node.children?.forEach(release)
+            for child in node.children ?? [] { release(child) }
             node.children = nil
         }
         release(node)
