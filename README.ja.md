@@ -45,7 +45,7 @@ Finder連携と物理的な外部ドライブ・ネットワークでの検証�
 
 2026-09-25に初期仕様を整理しました。プロジェクト名は仮称です。
 管理者・GitHubユーザー名は **[moooyooo](https://github.com/moooyooo)** です。
-ソースは[moooyooo/moooyooo-mac-explore](https://github.com/moooyooo/moooyooo-mac-explore)で開発版として公開します。
+ソースは[moooyooo/moooyooo-mac-explore](https://github.com/moooyooo/moooyooo-mac-explore)で開発版として公開しています。
 
 ## 目指す使い方
 

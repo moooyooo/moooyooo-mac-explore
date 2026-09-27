@@ -124,5 +124,12 @@ Git remoteは未設定で公開操作は行っていない。2026-09-27の署名
 - Secret scanning・push protectionを有効化し、設定結果を確認。
 - 翻訳236キーとテスト終了検出の3試験を再確認。アプリコードは検証済み`270bc85`から変更なし。
 
-初回のpushと[macOS 14/26 CI](https://github.com/moooyooo/moooyooo-mac-explore/actions/workflows/ci.yml)
-の結果を確認中。タグ・GitHub Release・一般利用向けバイナリ配布は今回のソース公開に含めない。
+`a52379d`を`main`へpushし、認証なしのAPIからPublic公開とMITを確認した。
+GitHubのsecret scanningでは確認時点の未解決警告は0件。
+
+[初回CI](https://github.com/moooyooo/moooyooo-mac-explore/actions/runs/36286045460)ではmacOS 26が
+全工程成功。macOS 14は既定のXcode 15.4がSwift 5.10を使うため、Swift 6パッケージの
+ビルド開始時に失敗した。インストール済みのXcode 16.2を明示する設定へ修正し、再確認する。
+使用可能なXcodeは[GitHub公式ランナー一覧](https://github.com/actions/runner-images/blob/macos-14-arm64/20260831.0302/images/macos/macos-14-arm64-Readme.md)で確認した。
+
+タグ・GitHub Release・一般利用向けバイナリ配布は今回のソース公開に含めない。
