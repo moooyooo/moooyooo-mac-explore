@@ -12,7 +12,7 @@ The [current backlog](backlog.md) separates implementation work, known issues an
 | P4 | Create, rename, copy, move, trash, drag-and-drop, Undo | Integrity, AppKit, separate APFS volume and real disk-full tests pass; Finder, physical/network volumes and disconnection remain |
 | P5 | Performance, accessibility and OS qualification | Local performance budgets and 50 pane cycles pass; IME, VoiceOver, display environments and minimum OS remain |
 | L10n | English/Japanese and language selection | Implemented; both workspace images reviewed; native panel/input checks remain |
-| P6 | Public documentation, CI and release preparation | Public upstream and private security reporting configured; hosted CI verification and signed distribution remain |
+| P6 | Public documentation, CI and release preparation | Source public, private security reporting enabled and macOS 14/26 CI passed; signed distribution and manual acceptance remain |
 
 By request, multilingual support and P6 preparation precede P4/P5. General-release
 criteria still include P4/P5. A browsing development preview may be published earlier
@@ -24,7 +24,10 @@ MIT/public documentation and verified development packaging.
 Public upstream: [moooyooo/moooyooo-mac-explore](https://github.com/moooyooo/moooyooo-mac-explore),
 with private vulnerability reporting enabled.
 
-Remaining: hosted CI verification; macOS 14, IME, display and VoiceOver checks; external-storage qualification;
+Hosted macOS 14/26 CI passed builds, integration and APFS-volume tests, and archive verification.
+
+Remaining: manual minimum-OS, IME, display and VoiceOver checks; external-storage qualification;
+replacement for the retiring macOS 14 runner;
 Developer ID signing, notarization and first-download verification.
 
 See [P5 verification](p5-verification.md), [P6 verification](p6-verification.md),

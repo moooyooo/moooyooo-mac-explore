@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.0 — in development (not published)
+## 0.6.0 — development preview (source published 2026-09-27)
 
 - Add View-menu sorting, column order/width editing and reset, navigation visibility
   and hidden-item toggles, plus Go → Home. Invalid column values stay in the sheet
@@ -15,6 +15,10 @@
   Testing runs even if the runtime exits 0.
 - Refresh English/Japanese workspace captures in light and dark appearances.
 - Record current issues, remaining qualification and maintainer publication actions.
+- Publish the source on GitHub with private vulnerability reporting, secret scanning
+  and push protection; add CI badges and clone instructions.
+- Select Xcode 16.2 on macOS 14 and make Mach metrics and recursive AppKit traversal
+  compatible with Swift 6.0.3.
 
 ## 0.5.0 — 2026-09-27 (development; not published)
 

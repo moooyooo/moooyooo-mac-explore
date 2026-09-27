@@ -27,7 +27,7 @@ Windows Explorerの操作感を基本にした、軽量なmacOSネイティブ�
 合成データの保全・AppKitの操作・専用APFSボリューム間の移動と実際の容量不足を検証しました。
 Finder連携と物理的な外部ドライブ・ネットワークでの検証は残っています。
 [ファイル操作の使い方と制約](docs/file-operations.md)を参照してください。
-マウスでの実操作・IME・VoiceOver・最小対応OSの検証も残っています。
+マウスでの実操作・IME・VoiceOver・最小対応OSでの手動確認も残っています。
 
 異常終了したセッションから、各Explorerの選択・スクロール位置・戻る／進む履歴も復旧できます。
 これらは個人用の復旧情報へ保存し、共有するプロジェクト形式はバージョン1を維持しています。
@@ -146,7 +146,7 @@ Xcodeを選択している環境では通常のSwiftPM設定を利用します�
 
 初期確認環境はmacOS 26.5 / Apple Silicon / Swift 6.3.2 / Command Line Toolsです。
 現在選択されている開発者ディレクトリはCommand Line Toolsです。
-GitHub Actions用にmacOS 14/26での実アプリ検証・Releaseビルド・アーカイブ検証を定義しています。
+GitHub ActionsのmacOS 14/26で実アプリの自動検証・Releaseビルド・アーカイブ検証が成功しています。
 実行状況は[GitHub Actions](https://github.com/moooyooo/moooyooo-mac-explore/actions/workflows/ci.yml)、
 公開時の確認結果は[P6の記録](docs/p6-verification.md)を参照してください。
 
@@ -173,7 +173,7 @@ scripts/test-volumes.sh
 ライセンスは[MIT](LICENSE)です。英語README・Issueテンプレート・配布スクリプトを追加しました。
 指定により、多言語対応を先に実装してP6の公開準備を進めています。
 日英・明暗の画面キャプチャと[0.6.0のリリースノート案](docs/releases/0.6.0.md)を用意しました。
-Publicリポジトリと非公開の脆弱性報告窓口を作成しました。CIの結果を確認し、
-一般配布に向けてDeveloper ID署名・公証と実環境での検証を進めます。
+Publicリポジトリでソースを公開し、非公開の脆弱性報告窓口を有効にしました。
+macOS 14/26のCIが成功し、一般配布に向けたDeveloper ID署名・公証と実環境での手動確認が残っています。
 作業の内訳とユーザー側で必要な対応は[TODO・ISSUE・ブロッカー](docs/backlog.md)にまとめています。
 検証条件は[配布手順](docs/releasing.md)と[P6の記録](docs/p6-verification.md)を参照してください。

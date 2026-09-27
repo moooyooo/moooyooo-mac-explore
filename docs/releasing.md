@@ -16,13 +16,14 @@ and supported-OS qualification remain incomplete.
 - [x] Confirm upstream `moooyooo/moooyooo-mac-explore` and approve publication.
 - [x] Review source/history for known private-data patterns and inspect screenshot metadata.
 - [x] Create upstream and enable/verify private vulnerability reporting.
-- [ ] Push the reviewed branch, run CI on macOS 14/26 and record results.
+- [x] Push the reviewed branch, run CI on macOS 14/26 and record results.
 
 The maintainer authorized public source publication on 2026-09-27. The upstream is
 [moooyooo/moooyooo-mac-explore](https://github.com/moooyooo/moooyooo-mac-explore),
 with `main` as its default branch and `origin` as the local remote.
 Private vulnerability reporting, secret scanning and push protection are enabled.
-The [P6 verification record](p6-verification.md) tracks publication and hosted CI.
+Both matrix jobs passed in [the verified run](https://github.com/moooyooo/moooyooo-mac-explore/actions/runs/36286852444).
+The [P6 verification record](p6-verification.md) records versions, test counts and scope.
 
 ## Local verification
 

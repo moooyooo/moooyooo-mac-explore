@@ -56,14 +56,15 @@ reload and acquire editing access after the existing owner closes it.
 
 ## Requirements
 
-- macOS 14 or later is the deployment target; the minimum OS still needs validation.
+- macOS 14 or later is the deployment target; manual minimum-OS qualification remains open.
 - Apple Silicon is the initial target. Intel has not been qualified.
 - Swift 6 and a macOS SDK, from Xcode or Command Line Tools.
 - Python 3 for repository validation and synthetic fixtures.
 
 Local verification uses macOS 26.5, Apple M2 Max and Swift 6.3.2 with Command Line
-Tools. CI targets macOS 14 and 26; see the [workflow results](https://github.com/moooyooo/moooyooo-mac-explore/actions/workflows/ci.yml)
-and [publication verification](docs/p6-verification.md) for its current status.
+Tools. Hosted macOS 14 and 26 builds, automated tests and archive verification pass.
+See the [workflow results](https://github.com/moooyooo/moooyooo-mac-explore/actions/workflows/ci.yml)
+and [publication verification](docs/p6-verification.md) for tested versions and scope.
 Builds contain the host architecture, not a universal binary.
 
 ## Build and run
@@ -151,7 +152,7 @@ restoration and both languages in a relocated packaged app.
 Recovery includes each pane's selection, viewport and back/forward history in
 private session files. Shared project schema version 1 is unchanged.
 Manual mouse/keyboard, IME, VoiceOver, display scaling and native panel checks remain
-open. Minimum-OS and Intel verification, Developer ID signing, notarization and
+open. Manual minimum-OS and Intel verification, Developer ID signing, notarization and
 first-download testing remain release gates. See [performance qualification](docs/p5-verification.md)
 and the [P6 status](docs/p6-verification.md).
 
