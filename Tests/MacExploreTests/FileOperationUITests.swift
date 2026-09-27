@@ -52,7 +52,7 @@ struct FileOperationUITests {
             let field = try #require(views.compactMap { $0 as? NSTextField }.first { $0.isEditable })
             field.stringValue = name
             let button = try #require(views.compactMap { $0 as? NSButton }.first { $0.title == buttonTitle })
-            button.performClick(nil)
+            #expect(NSApp.sendAction(try #require(button.action), to: button.target, from: button))
         }
         try enter("資料 UI 🗂", buttonTitle: L10n.text(.createItem))
         try await waitUntil { !operations.isBusy && browser.table.numberOfRows == 1 && browser.table.selectedRow == 0 }
@@ -138,14 +138,16 @@ struct FileOperationUITests {
         try await waitUntil { window.attachedSheet != nil }
         let sheet = try #require(window.attachedSheet?.contentView)
         let button = try #require(descendants(sheet).compactMap { $0 as? NSButton }.first { $0.title == L10n.text(.moveToTrash) })
-        button.performClick(nil)
+        #expect(NSApp.sendAction(try #require(button.action), to: button.target, from: button))
         for _ in 0..<100 {
             if !operations.isBusy { break }
             if let content = window.attachedSheet?.contentView, content !== sheet {
                 let controls = descendants(content)
                 let errors: [String] = controls.compactMap { ($0 as? NSTextField)?.stringValue ?? ($0 as? NSTextView)?.string }.filter { !$0.isEmpty }
                 Issue.record("Unexpected Trash result: \(errors.joined(separator: " | "))")
-                controls.compactMap { $0 as? NSButton }.first?.performClick(nil)
+                if let button = controls.compactMap({ $0 as? NSButton }).first, let action = button.action {
+                    _ = NSApp.sendAction(action, to: button.target, from: button)
+                }
                 break
             }
             try await Task.sleep(for: .milliseconds(20))

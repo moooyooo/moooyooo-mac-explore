@@ -1,3 +1,5 @@
+import Foundation
+
 public enum AppCommand: Int, Sendable {
     case newPane, newWindow, newInstance, openFolder, closePane, closeWindow
     case back, forward, up, refresh, focusAddress, focusSearch
@@ -8,9 +10,9 @@ public enum AppCommand: Int, Sendable {
     case favorite, openInNewPane
     case newFolder, renameItem, trashFiles, copyFiles, cutFiles, pasteFiles, undoFiles, copyPath, contextMenu, selectAll
     case recoverFileOperations
+    case sortName, sortModified, sortKind, sortSize, sortAscending, sortDescending
+    case toggleHidden, toggleNavigation, columnSettings, resetColumns, home
 }
-
-import Foundation
 
 public struct KeyModifiers: OptionSet, Sendable {
     public let rawValue: Int

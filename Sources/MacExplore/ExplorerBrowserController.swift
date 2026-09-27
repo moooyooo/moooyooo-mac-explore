@@ -29,11 +29,14 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     private var dropTask: Task<Void, Never>?
     var selectedURLs: [URL] {
         if view.window?.firstResponder === tree.outline { return tree.selectedURL.map { [$0] } ?? [] }
-        guard !loading else { return [] }
+        guard !loading, failedRequest == nil else { return [] }
         return table.selectedRowIndexes.compactMap { visibleEntries.indices.contains($0) ? visibleEntries[$0].url : nil }
     }
     var operationDirectory: URL {
         view.window?.firstResponder === tree.outline ? tree.selectedURL ?? directory : directory
+    }
+    var canUseOperationDirectory: Bool {
+        !loading && (view.window?.firstResponder === tree.outline ? tree.selectedURL != nil : failedRequest == nil)
     }
     private var settings: BrowserSettings
     private var history = NavigationHistory()
@@ -48,8 +51,9 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     private var generation = UUID()
     private(set) var loading = false
     private var reading = false
-    var readyItemCount: Int? { !loading && errorMessage == nil ? visibleEntries.count : nil }
+    var readyItemCount: Int? { !loading && failedRequest == nil ? visibleEntries.count : nil }
     private var errorMessage: String?
+    private var failedRequest: (url: URL, navigation: Navigation)?
     private let root = LayoutView()
     let address = NSTextField()
     let search = NSSearchField()
@@ -61,6 +65,10 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     private var originalTreeWidth: Double = 160
     private var configuring = true
     private let status = NSTextField(labelWithString: "")
+    private let unavailable = NSScrollView()
+    private let unavailableContent = FlippedView()
+    private let unavailableMessage = NSTextField(wrappingLabelWithString: "")
+    private var recoveryButtons: [NSButton] = []
     private let hiddenToggle = NSButton(checkboxWithTitle: L10n.text(.hiddenItems), target: nil, action: nil)
     private var navButtons: [NSButton] = []
     private var watchWarning: String?
@@ -90,7 +98,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         view = root
         root.onLayout = { [weak self] in self?.layoutContents() }
         root.wantsLayer = true
-        root.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        root.semanticBackground = .windowBackgroundColor
 
         navButtons = [
             ActionButton(L10n.text(.back), symbol: "chevron.left") { [weak self] in self?.goBack() },
@@ -173,9 +181,9 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         tree.onNavigate = { [weak self] url in self?.navigate(to: url) }
         tree.outline.onContextMenu = { [weak self] in self?.contextMenu() ?? NSMenu() }
         tree.onExpandedChange = { [weak self] urls in self?.settings.expandedDirectories = urls; self?.onSettingsChange?() }
-        tree.configure(expanded: settings.expandedDirectories, favorites: settings.favorites, showHidden: settings.showHidden)
+        configureTree()
         divider.wantsLayer = true
-        divider.layer?.backgroundColor = NSColor.separatorColor.cgColor
+        divider.semanticBackground = .separatorColor
         divider.setAccessibilityElement(true)
         divider.setAccessibilityRole(.button)
         divider.setAccessibilityLabel(L10n.text(.resizeTree))
@@ -195,6 +203,26 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         status.textColor = .secondaryLabelColor
         status.lineBreakMode = .byTruncatingTail
         root.addSubview(status)
+        unavailable.backgroundColor = .controlBackgroundColor
+        unavailable.borderType = .bezelBorder
+        unavailable.hasVerticalScroller = true
+        unavailable.autohidesScrollers = true
+        unavailable.documentView = unavailableContent
+        unavailable.isHidden = true
+        unavailable.setAccessibilityElement(true)
+        unavailable.setAccessibilityRole(.group)
+        unavailable.setAccessibilityIdentifier("unavailable-\(paneID)")
+        unavailableMessage.font = .systemFont(ofSize: 12)
+        unavailableMessage.alignment = .center
+        unavailableMessage.setAccessibilityIdentifier("location-error")
+        unavailableContent.addSubview(unavailableMessage)
+        recoveryButtons = [
+            ActionButton(L10n.text(.retry), symbol: "arrow.clockwise") { [weak self] in self?.reload() },
+            ActionButton(L10n.text(.chooseFolder), symbol: "folder") { [weak self] in self?.chooseReplacementFolder() },
+            ActionButton(L10n.text(.dismissLocationError)) { [weak self] in self?.dismissLocationError() },
+        ]
+        for button in recoveryButtons { unavailableContent.addSubview(button) }
+        root.addSubview(unavailable)
         configuring = false
     }
 
@@ -213,13 +241,24 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         hiddenToggle.frame = NSRect(x: 8, y: 38, width: hiddenWidth, height: 24)
         search.frame = NSRect(x: hiddenWidth + 23, y: 39, width: max(60, width - hiddenWidth - 31), height: 24)
         breadcrumb.frame = NSRect(x: 7, y: 68, width: max(0, width - 14), height: 22)
-        let sidebarWidth: CGFloat = width >= 500 ? min(settings.treeWidth, width * 0.42) : 0
+        let sidebarWidth: CGFloat = width >= 500 && settings.showNavigation ? min(settings.treeWidth, width * 0.42) : 0
         tree.view.isHidden = sidebarWidth == 0
         divider.isHidden = sidebarWidth == 0
         tree.view.frame = NSRect(x: 5, y: 95, width: sidebarWidth, height: max(0, height - 121))
         divider.frame = NSRect(x: 5 + sidebarWidth, y: 95, width: 5, height: max(0, height - 121))
         scroll.frame = NSRect(x: 10 + sidebarWidth, y: 95, width: max(0, width - sidebarWidth - 15), height: max(0, height - 121))
         status.frame = NSRect(x: 8, y: max(0, height - 23), width: max(0, width - 32), height: 18)
+        unavailable.frame = scroll.frame
+        unavailableContent.frame = NSRect(x: 0, y: 0, width: unavailable.contentSize.width, height: max(230, unavailable.contentSize.height))
+        let messageHeight: CGFloat = 110
+        unavailableMessage.frame = NSRect(x: 12, y: max(8, (unavailableContent.bounds.height - messageHeight - 105) / 2),
+                                          width: max(0, unavailableContent.bounds.width - 24), height: messageHeight)
+        var y = unavailableMessage.frame.maxY + 8
+        for button in recoveryButtons {
+            button.frame = NSRect(x: max(8, (unavailableContent.bounds.width - 220) / 2), y: y,
+                                  width: min(220, max(0, unavailableContent.bounds.width - 16)), height: 28)
+            y += 30
+        }
     }
 
     func navigate(to url: URL, via navigation: Navigation = .visit) {
@@ -238,6 +277,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         loading = true
         reading = true
         errorMessage = nil
+        failedRequest = nil; unavailable.isHidden = true
         status.stringValue = L10n.text(.loading)
         address.stringValue = url.path
         let includeHidden = settings.showHidden
@@ -274,6 +314,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
                 self.loading = false
                 self.reading = false
                 self.errorMessage = Self.locationError(error)
+                self.failedRequest = (url, navigation)
                 self.address.stringValue = self.directory.path
                 self.watch(self.directory)
                 self.updateStatus()
@@ -291,7 +332,10 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: scroll.contentView)
         watchedURL = nil; tree.stop()
     }
-    func reload() { navigate(to: directory, via: history.current == nil ? .visit : .reload) }
+    func reload() {
+        if let failedRequest { navigate(to: failedRequest.url, via: failedRequest.navigation) }
+        else { navigate(to: directory, via: history.current == nil ? .visit : .reload) }
+    }
     func goBack() { if let url = history.back { navigate(to: url, via: .back) } }
     func goForward() { if let url = history.forward { navigate(to: url, via: .forward) } }
     func goUp() { navigate(to: directory.deletingLastPathComponent()) }
@@ -346,13 +390,106 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     func toggleFavorite() {
         if settings.favorites.contains(directory) { settings.favorites.removeAll { $0 == directory } }
         else if settings.favorites.count < 32 { settings.favorites.append(directory) }
-        tree.configure(expanded: settings.expandedDirectories, favorites: settings.favorites, showHidden: settings.showHidden)
+        configureTree()
         onSettingsChange?()
+    }
+
+    private func configureTree() {
+        tree.configure(expanded: settings.showNavigation ? settings.expandedDirectories : [],
+                       favorites: settings.favorites, showHidden: settings.showHidden)
+    }
+
+    @discardableResult
+    func performViewCommand(_ command: AppCommand) -> Bool {
+        if let column = BrowserViewMenu.column(for: command) { setSort(column: column, ascending: settings.ascending); return true }
+        switch command {
+        case .sortAscending: setSort(column: settings.sortColumn, ascending: true)
+        case .sortDescending: setSort(column: settings.sortColumn, ascending: false)
+        case .toggleHidden:
+            hiddenToggle.state = settings.showHidden ? .off : .on
+            toggleHidden()
+        case .toggleNavigation:
+            settings.showNavigation.toggle()
+            if !settings.showNavigation {
+                if view.window?.firstResponder === tree.outline || view.window?.firstResponder === divider { focusFiles() }
+                tree.stop()
+            } else { configureTree() }
+            layoutContents(); onSettingsChange?()
+        case .columnSettings:
+            guard let window = view.window, window.attachedSheet == nil else { return true }
+            let columns = savedSettings.columns
+            Task { [weak self] in
+                guard let result = await ColumnSettingsSheet.present(columns, in: window),
+                      let self, self.view.window === window else { return }
+                self.applyColumns(result)
+            }
+        case .resetColumns: applyColumns(BrowserSettings().columns)
+        case .home: navigate(to: FileManager.default.homeDirectoryForCurrentUser)
+        default: return false
+        }
+        return true
+    }
+
+    func validateViewMenuItem(_ item: NSMenuItem, command: AppCommand) -> Bool? {
+        if let column = BrowserViewMenu.column(for: command) {
+            item.state = settings.sortColumn == column ? .on : .off
+        } else {
+            switch command {
+            case .sortAscending: item.state = settings.ascending ? .on : .off
+            case .sortDescending: item.state = settings.ascending ? .off : .on
+            case .toggleHidden: item.state = settings.showHidden ? .on : .off
+            case .toggleNavigation: item.state = settings.showNavigation ? .on : .off
+            case .columnSettings, .resetColumns, .home: break
+            default: return nil
+            }
+        }
+        return view.window?.attachedSheet == nil
+    }
+
+    private func setSort(column: FileColumn, ascending: Bool) {
+        settings.sortColumn = column; settings.ascending = ascending
+        configuring = true
+        table.sortDescriptors = [NSSortDescriptor(key: column.rawValue, ascending: ascending)]
+        configuring = false
+        applyFilterAndSort(); onSettingsChange?()
+    }
+
+    private func applyColumns(_ columns: [ColumnSettings]) {
+        configuring = true
+        for (destination, setting) in columns.enumerated() {
+            if let source = table.tableColumns.firstIndex(where: { $0.identifier.rawValue == setting.column.rawValue }) {
+                if source != destination { table.moveColumn(source, toColumn: destination) }
+                table.tableColumns[destination].width = setting.width
+            }
+        }
+        configuring = false
+        settings.columns = columns
+        onSettingsChange?()
+    }
+
+    private func chooseReplacementFolder() {
+        guard let window = view.window, window.attachedSheet == nil else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.allowsMultipleSelection = false
+        panel.directoryURL = (failedRequest?.url ?? directory).deletingLastPathComponent()
+        panel.prompt = L10n.text(.open)
+        panel.beginSheetModal(for: window) { [weak self] answer in
+            guard answer == .OK, let url = panel.url, let self, self.view.window === window else { return }
+            self.navigate(to: url)
+        }
+    }
+
+    private func dismissLocationError() {
+        guard let failedRequest, failedRequest.url != directory, history.current != nil else { return }
+        self.failedRequest = nil; errorMessage = nil
+        address.stringValue = directory.path
+        updateStatus(); focusFiles()
     }
 
     func openSelectionInNewPane() {
         if view.window?.firstResponder === tree.outline, let url = tree.selectedURL { onOpenInNewPane?(url); return }
-        guard visibleEntries.indices.contains(table.selectedRow), visibleEntries[table.selectedRow].isBrowsable else { return }
+        guard !loading, failedRequest == nil, visibleEntries.indices.contains(table.selectedRow),
+              visibleEntries[table.selectedRow].isBrowsable else { return }
         onOpenInNewPane?(visibleEntries[table.selectedRow].url)
     }
 
@@ -382,13 +519,13 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
 
     @objc private func toggleHidden() {
         settings.showHidden = hiddenToggle.state == .on
-        tree.configure(expanded: settings.expandedDirectories, favorites: settings.favorites, showHidden: settings.showHidden)
+        configureTree()
         onSettingsChange?(); reload()
     }
 
     @objc func openSelected() {
         if view.window?.firstResponder === tree.outline, let url = tree.selectedURL { navigate(to: url); return }
-        guard !loading, visibleEntries.indices.contains(table.selectedRow) else { return }
+        guard !loading, failedRequest == nil, visibleEntries.indices.contains(table.selectedRow) else { return }
         let item = visibleEntries[table.selectedRow]
         if item.isBrowsable { navigate(to: item.url) }
         else if !NSWorkspace.shared.open(item.url) { errorMessage = L10n.text(.openFileFailed); updateStatus() }
@@ -437,6 +574,15 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         status.stringValue = errorMessage ?? parts.joined(separator: " · ")
         status.toolTip = status.stringValue
         status.textColor = errorMessage == nil ? .secondaryLabelColor : .systemRed
+        unavailable.isHidden = failedRequest == nil
+        scroll.isHidden = failedRequest != nil
+        if let failedRequest {
+            unavailableMessage.stringValue = L10n.format(.locationUnavailable, failedRequest.url.path, errorMessage ?? "")
+            unavailableMessage.toolTip = unavailableMessage.stringValue
+            unavailable.setAccessibilityLabel(unavailableMessage.stringValue)
+            recoveryButtons[2].isHidden = failedRequest.url == directory || history.current == nil
+            layoutContents()
+        }
     }
 
     func selectAfterReload(_ urls: [URL]) {
@@ -454,10 +600,10 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
 
     func contextMenu() -> NSMenu {
         let menu = NSMenu()
-        func add(_ key: L10n.Key, _ command: AppCommand, keyEquivalent: String = "") {
+        func add(_ key: L10n.Key, _ command: AppCommand, keyEquivalent: String = "", to submenu: NSMenu? = nil) {
             let item = NSMenuItem(title: L10n.text(key), action: #selector(contextCommand(_:)), keyEquivalent: keyEquivalent)
             item.target = self; item.tag = command.rawValue
-            menu.addItem(item)
+            (submenu ?? menu).addItem(item)
         }
         if !selectedURLs.isEmpty {
             let open = NSMenuItem(title: L10n.text(.contextOpen), action: #selector(openSelected), keyEquivalent: "")
@@ -475,12 +621,22 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
         add(.newFolder, .newFolder)
         add(.undo, .undoFiles, keyEquivalent: "z")
         menu.addItem(.separator())
+        let sort = NSMenu(title: L10n.text(.sortBy))
+        let sortItem = NSMenuItem(title: sort.title, action: nil, keyEquivalent: "")
+        sortItem.submenu = sort; menu.addItem(sortItem)
+        for (title, command) in BrowserViewMenu.sortItems { add(title, command, to: sort) }
+        sort.addItem(.separator())
+        add(.sortAscending, .sortAscending, to: sort)
+        add(.sortDescending, .sortDescending, to: sort)
+        add(.columnsMenu, .columnSettings)
+        add(.hiddenItems, .toggleHidden)
         add(.refresh, .refresh)
         return menu
     }
 
     @objc private func contextCommand(_ sender: NSMenuItem) {
         guard let command = AppCommand(rawValue: sender.tag) else { return }
+        if performViewCommand(command) { return }
         if command == .refresh { reload() }
         else if command == .openInNewPane { openSelectionInNewPane() }
         else { fileOperations?.perform(command, in: self) }
@@ -488,6 +644,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         guard item.action == #selector(contextCommand(_:)), let command = AppCommand(rawValue: item.tag) else { return !selectedURLs.isEmpty }
+        if let enabled = validateViewMenuItem(item, command: command) { return enabled }
         if command == .refresh { return true }
         if command == .openInNewPane {
             if view.window?.firstResponder === tree.outline { return tree.selectedURL != nil }
@@ -505,7 +662,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
 
     func numberOfRows(in tableView: NSTableView) -> Int { visibleEntries.count }
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
-        guard !loading, visibleEntries.indices.contains(row) else { return nil }
+        guard !loading, failedRequest == nil, visibleEntries.indices.contains(row) else { return nil }
         return visibleEntries[row].url as NSURL
     }
 
@@ -520,7 +677,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
 
     func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int,
                    proposedDropOperation operation: NSTableView.DropOperation) -> NSDragOperation {
-        guard !loading, fileOperations?.isBusy == false else { return [] }
+        guard !loading, failedRequest == nil, fileOperations?.isBusy == false else { return [] }
         let request = requestForDrop(info, row: row, operation: operation)
         if request.destination == directory { tableView.setDropRow(-1, dropOperation: .on) }
         if request != dropRequest {
@@ -540,7 +697,7 @@ final class ExplorerBrowserController: NSViewController, NSTableViewDataSource, 
     func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int,
                    dropOperation operation: NSTableView.DropOperation) -> Bool {
         let request = requestForDrop(info, row: row, operation: operation)
-        guard request == dropRequest, let kind = dropKind, fileOperations?.isBusy == false,
+        guard !loading, failedRequest == nil, request == dropRequest, let kind = dropKind, fileOperations?.isBusy == false,
               info.draggingSourceOperationMask.contains(kind == .move ? .move : .copy) else { return false }
         fileOperations?.transfer(request.sources, to: request.destination, kind: kind, browser: self)
         dropRequest = nil; dropKind = nil; dropTask = nil

@@ -6,7 +6,7 @@ A lightweight native macOS file manager with Windows Explorer-inspired controls.
 Arrange multiple Explorer panes inside an MDI window, keep several workspaces open,
 launch independent app processes, and save each workspace as a project.
 
-**0.5.0 development preview.** Browsing, projects, session recovery and basic file operations are implemented.
+**0.6.0 development preview.** Browsing, projects, session recovery and basic file operations are implemented.
 File operations have synthetic-data, native AppKit and separate APFS volume tests;
 manual/Finder and physical removable/network-drive qualification remain open.
 See [file operations and limits](docs/file-operations.md).
@@ -27,6 +27,8 @@ Actual AppKit window content with synthetic files, captured in English and Japan
 - Independent app processes, including opening a saved project in another process.
 - Folder tree, breadcrumbs, details table, column sorting, navigation history,
   filename filtering, hidden items, favorites and automatic refresh.
+- View menus for sorting, column order/width and navigation visibility; per-pane
+  retry/folder selection when a location cannot be opened; live light/dark updates.
 - `.mexplore` projects preserve folders, pane arrangement, columns, filters and tree settings.
 - Project editing locks, detection of outside changes, atomic saves and recovery
   of interrupted workspaces, including selection, viewport and navigation history.
@@ -169,7 +171,8 @@ processes editing the same project must use the same support directory.
 
 - [Contributing](CONTRIBUTING.md), [security reporting](SECURITY.md)
 - [Release preparation and packaging](docs/releasing.md)
-- [0.5.0 development release notes](docs/releases/0.5.0.md)
+- [0.6.0 development release notes](docs/releases/0.6.0.md)
+- [Current TODOs, issues and maintainer actions](docs/backlog.md)
 - [Requirements](docs/requirements.md), [UX](docs/ux.md), [architecture](docs/architecture.md),
   [project format](docs/projects.md) (detailed design documents currently in Japanese)
 - [Asset and dependency provenance](THIRD_PARTY_NOTICES.md)

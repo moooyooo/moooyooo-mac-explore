@@ -2,6 +2,26 @@ import AppKit
 
 class FlippedView: NSView {
     override var isFlipped: Bool { true }
+    var semanticBackground: NSColor? { didSet { refreshAppearance() } }
+    var semanticBorder: NSColor? { didSet { refreshAppearance() } }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshAppearance()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        refreshAppearance()
+    }
+
+    private func refreshAppearance() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            if let semanticBackground { layer?.backgroundColor = semanticBackground.cgColor }
+            if let semanticBorder { layer?.borderColor = semanticBorder.cgColor }
+        }
+        needsDisplay = true
+    }
 }
 
 final class LayoutView: FlippedView {

@@ -1,6 +1,6 @@
 # Release preparation
 
-**0.5.0 is a development preview.** Browsing, projects, session recovery and basic
+**0.6.0 is a development preview.** Browsing, projects, session recovery and basic
 file operations are available. Local performance targets pass; manual, external-storage
 and supported-OS qualification remain incomplete.
 
@@ -27,6 +27,7 @@ publication actions.
 
 ```sh
 python3 scripts/check-localizations.py
+python3 -m unittest discover -s Tests/ScriptTests
 scripts/build-app.sh release
 scripts/test.sh --integration
 scripts/test-volumes.sh
@@ -37,13 +38,13 @@ git diff --check
 Verification checks bundle metadata, translations, notices, architecture, code
 signature and accidental developer home paths. Relocated-app tests check that the
 app loads its own translations. Integration tests need a macOS GUI session.
-The CI workflow includes them but has not run on GitHub yet.
+The CI workflow includes them but has not run on GitHub yet. The test wrapper also requires a successful final Swift Testing total; exit status 0 alone is not a passing run.
 See [GitHub's runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 
 Run `scripts/benchmark-ui.sh` separately on the reference Mac with a GUI session.
 It includes 60 seconds of idle sampling and creates only synthetic files.
 Timing budgets are not CI runner gates: shared runner load is not a stable
-performance baseline. See [P5 measurements](p5-verification.md).
+performance baseline. See the 0.5.0 baseline and 0.6.0 qualification notes in [P5 measurements](p5-verification.md).
 
 The [English/Japanese screenshots](screenshots.md) show real AppKit window content
 using synthetic files. Their debug-only export command is excluded from release
@@ -60,7 +61,7 @@ host architecture; do not label them universal.
 scripts/package-release.sh --development
 ```
 
-Ignored `dist/` contains `Moooyooo-Mac-Explore-0.5.0-arm64-dev.zip` (host architecture),
+Ignored `dist/` contains `Moooyooo-Mac-Explore-0.6.0-arm64-dev.zip` (host architecture),
 a `.sha256` checksum and `.build.txt` with version, commit, dirty/clean state and toolchain.
 The script rebuilds, stages, archives, extracts and verifies the extracted app.
 Existing artifacts are never overwritten; move old artifacts before repeating it.
@@ -69,7 +70,7 @@ Ad-hoc signing is for development and is not Developer ID signing or notarizatio
 Check an archive from its directory:
 
 ```sh
-shasum -a 256 -c Moooyooo-Mac-Explore-0.5.0-arm64-dev.sha256
+shasum -a 256 -c Moooyooo-Mac-Explore-0.6.0-arm64-dev.sha256
 ```
 
 ## Retrieve CI artifacts
@@ -119,13 +120,13 @@ and [custom workflow](https://developer.apple.com/documentation/security/customi
 ## Version and release notes
 
 Update `CFBundleShortVersionString`/`CFBundleVersion` in `Resources/Info.plist`,
-the changelog and README together. Project schema version 1 is unchanged in 0.5.0.
+the changelog and README together. Project schema version 1 is unchanged in 0.6.0.
 UI language does not alter saved names, serialized keys or bookmark bytes.
-The [0.5.0 release notes draft](releases/0.5.0.md) lists features, known limitations
+The [0.6.0 release notes draft](releases/0.6.0.md) lists features, known limitations
 and local build instructions; add the actual publication/CI/artifact information
 when it exists.
 
-Verify the exact clean commit before tagging `v0.5.0` (or a named prerelease).
+Verify the exact clean commit before tagging `v0.6.0` (or a named prerelease).
 Release notes must include tested platforms, incomplete features, known issues,
 installation steps and checksums. Signing timestamps prevent byte-for-byte
 reproducibility; retain the commit/toolchain record instead of promising identical hashes.

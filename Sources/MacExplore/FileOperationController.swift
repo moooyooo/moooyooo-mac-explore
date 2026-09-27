@@ -65,10 +65,10 @@ final class FileOperationController: NSObject {
         guard let browser, browser.view.window?.attachedSheet == nil else { return false }
         let selection = browser.selectedURLs
         switch command {
-        case .newFolder: return !browser.loading
+        case .newFolder: return browser.canUseOperationDirectory
         case .renameItem: return selection.count == 1
         case .copyFiles, .cutFiles, .trashFiles, .copyPath: return !selection.isEmpty
-        case .pasteFiles: return !browser.loading && !Self.clipboardURLs(pasteboard).isEmpty
+        case .pasteFiles: return browser.canUseOperationDirectory && !Self.clipboardURLs(pasteboard).isEmpty
         default: return true
         }
     }

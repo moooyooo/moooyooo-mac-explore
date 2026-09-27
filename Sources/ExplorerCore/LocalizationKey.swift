@@ -36,6 +36,20 @@ extension L10n {
         case cancel
         case reacquireFailed
         case hiddenItems
+        case sortBy
+        case sortAscending
+        case sortDescending
+        case columnsMenu
+        case columnsDetail
+        case columnsInvalid
+        case columnOrder
+        case columnWidth
+        case resetColumns
+        case navigationPane
+        case apply
+        case retry
+        case locationUnavailable
+        case dismissLocationError
         case back
         case forward
         case up

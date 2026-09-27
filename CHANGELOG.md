@@ -1,6 +1,22 @@
 # Changelog
 
-## 0.5.0 — in development (not published)
+## 0.6.0 — in development (not published)
+
+- Add View-menu sorting, column order/width editing and reset, navigation visibility
+  and hidden-item toggles, plus Go → Home. Invalid column values stay in the sheet
+  with an explanation and Apply disabled until corrected.
+- Save navigation visibility as an optional version-1 project field; older projects
+  default to a visible navigation tree.
+- Show a pane-local recovery view for unreadable folders with Retry, Open Folder
+  and Return to Current Folder; prevent file commands/dragging from stale rows.
+- Keep custom workspace backgrounds, dividers and pane borders in sync with appearance changes.
+- Keep folder-selection dialogs attached to the Explorer that opened them.
+- Add native control-action and compatibility tests, and reject incomplete Swift
+  Testing runs even if the runtime exits 0.
+- Refresh English/Japanese workspace captures in light and dark appearances.
+- Record current issues, remaining qualification and maintainer publication actions.
+
+## 0.5.0 — 2026-09-27 (development; not published)
 
 - Recover selections, viewport anchors and navigation history in private session
   records; retain selection/position when navigating back and forward.

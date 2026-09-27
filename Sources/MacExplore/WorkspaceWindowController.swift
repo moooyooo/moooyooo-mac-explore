@@ -70,7 +70,7 @@ final class PaneChrome: FlippedView {
         titleBar.active = active
         titleBar.setAccessibilityLabel(L10n.format(.movePaneAccessibility, name))
         setAccessibilityLabel(active ? L10n.format(.activePaneAccessibility, name) : name)
-        layer?.borderColor = (active ? NSColor.controlAccentColor : NSColor.separatorColor).cgColor
+        semanticBorder = active ? .controlAccentColor : .separatorColor
         layer?.borderWidth = active ? 2 : 1
         grip.isHidden = pane.presentation == .maximized
         maximizeButton.image = NSImage(systemSymbolName: pane.presentation == .maximized ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right", accessibilityDescription: L10n.text(.maximizeRestore))
@@ -126,6 +126,7 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         root.onLayout = { [weak self] in self?.layoutWorkspace() }
         root.wantsLayer = true
         canvas.wantsLayer = true
+        canvas.semanticBackground = .underPageBackgroundColor
         canvas.layer?.masksToBounds = true
         canvas.onLayout = { [weak self] in self?.layoutPanes() }
         emptyMessage.font = .systemFont(ofSize: 15)
@@ -273,17 +274,18 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func chooseFolder() {
-        guard let window else { return }
+        guard let window, window.attachedSheet == nil else { return }
+        let target = activeBrowser
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.directoryURL = activeBrowser?.directory
         panel.prompt = L10n.text(.open)
-        panel.beginSheetModal(for: window) { [weak self] response in
+        panel.beginSheetModal(for: window) { [weak self, weak target] response in
             guard response == .OK, let url = panel.url, let self else { return }
-            if let browser = self.activeBrowser { browser.navigate(to: url) }
-            else { self.addPane(directory: url) }
+            if let target, self.browsers[target.paneID] === target { target.navigate(to: url) }
+            else if self.state.panes.isEmpty { self.addPane(directory: url) }
         }
     }
 
@@ -350,7 +352,6 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
             x += buttonWidth + 6
         }
         canvas.frame = NSRect(x: 6, y: 44, width: max(1, width - 12), height: max(1, height - 82))
-        canvas.layer?.backgroundColor = NSColor.underPageBackgroundColor.cgColor
         shelf.frame = NSRect(x: 8, y: height - 33, width: max(0, width - 16), height: 29)
         hint.frame = NSRect(x: 10, y: height - 30, width: max(0, width - 20), height: 20)
         layoutPanes()

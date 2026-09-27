@@ -16,11 +16,30 @@ public struct BrowserSettings: Codable, Equatable, Sendable {
     public var sortColumn: FileColumn = .name
     public var ascending = true
     public var showHidden = false
+    public var showNavigation = true
     public var filter = ""
     public var treeWidth: Double = 160
     public var expandedDirectories: [URL] = []
     public var favorites: [URL] = []
     public init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case columns, sortColumn, ascending, showHidden, showNavigation, filter, treeWidth, expandedDirectories, favorites
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        columns = try values.decode([ColumnSettings].self, forKey: .columns)
+        sortColumn = try values.decode(FileColumn.self, forKey: .sortColumn)
+        ascending = try values.decode(Bool.self, forKey: .ascending)
+        showHidden = try values.decode(Bool.self, forKey: .showHidden)
+        // Additive display preference; version-1 projects from older apps remain readable.
+        showNavigation = try values.decodeIfPresent(Bool.self, forKey: .showNavigation) ?? true
+        filter = try values.decode(String.self, forKey: .filter)
+        treeWidth = try values.decode(Double.self, forKey: .treeWidth)
+        expandedDirectories = try values.decode([URL].self, forKey: .expandedDirectories)
+        favorites = try values.decode([URL].self, forKey: .favorites)
+    }
 }
 
 public struct FolderReference: Codable, Equatable, Sendable {

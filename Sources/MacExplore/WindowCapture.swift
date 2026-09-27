@@ -7,7 +7,8 @@ import Darwin
 /// It does not read the desktop, WindowServer surfaces, or another application's UI.
 @MainActor
 enum WindowCapture {
-    static func start(to destination: URL, workspace: @escaping @MainActor () -> WorkspaceWindowController?,
+    static func start(to destination: URL, appearance: NSAppearance.Name = .aqua,
+                      workspace: @escaping @MainActor () -> WorkspaceWindowController?,
                       finish: @escaping @MainActor () async -> Void) {
         Task {
             do {
@@ -26,7 +27,7 @@ enum WindowCapture {
                       let view = content.superview else {
                     throw CaptureError.notReady
                 }
-                window.appearance = NSAppearance(named: .aqua)
+                window.appearance = NSAppearance(named: appearance)
                 window.makeKeyAndOrderFront(nil)
                 view.layoutSubtreeIfNeeded()
                 window.display()
@@ -50,7 +51,7 @@ enum WindowCapture {
                     "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
                     "renderer": "NSView.cacheDisplay",
                     "region": "window-content",
-                    "appearance": "aqua",
+                    "appearance": appearance == .darkAqua ? "darkAqua" : "aqua",
                     "pixelWidth": bitmap.pixelsWide,
                     "pixelHeight": bitmap.pixelsHigh,
                     "paneCount": ready.state.panes.count,

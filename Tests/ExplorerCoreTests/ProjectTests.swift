@@ -15,6 +15,7 @@ private func sampleProject() -> ProjectDocument {
     document.panes[0].settings.sortColumn = .modified
     document.panes[0].settings.ascending = false
     document.panes[0].settings.showHidden = true
+    document.panes[0].settings.showNavigation = false
     document.panes[0].settings.filter = "資料"
     document.panes[0].settings.expandedDirectories = [URL(fileURLWithPath: "/example")]
     return document
@@ -36,6 +37,23 @@ private func sampleProject() -> ProjectDocument {
     #expect(throws: ProjectError.unsupportedVersion(999)) { try ProjectDocument.decode(Data(#"{"schemaVersion":999}"#.utf8)) }
     #expect(throws: (any Error).self) { try ProjectDocument.decode(Data("broken JSON".utf8)) }
     #expect(throws: ProjectError.tooLarge) { try ProjectDocument.decode(Data(repeating: 32, count: ProjectDocument.maximumBytes + 1)) }
+}
+
+@Test func oldProjectWithoutNavigationPreferenceUsesVisibleTree() throws {
+    let original = sampleProject()
+    var json = try #require(JSONSerialization.jsonObject(with: original.encoded()) as? [String: Any])
+    var panes = try #require(json["panes"] as? [[String: Any]])
+    for index in panes.indices {
+        var settings = try #require(panes[index]["settings"] as? [String: Any])
+        settings.removeValue(forKey: "showNavigation")
+        panes[index]["settings"] = settings
+    }
+    json["panes"] = panes
+    let decoded = try ProjectDocument.decode(JSONSerialization.data(withJSONObject: json))
+    #expect(decoded.schemaVersion == 1)
+    #expect(decoded.panes.allSatisfy { $0.settings.showNavigation })
+    #expect(decoded.panes[0].settings.columns == original.panes[0].settings.columns)
+    #expect(decoded.panes[0].settings.expandedDirectories == original.panes[0].settings.expandedDirectories)
 }
 
 @Test func projectRejectsInvalidIdentitiesGeometryAndURLs() {

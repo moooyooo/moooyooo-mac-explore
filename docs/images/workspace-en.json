@@ -16,5 +16,5 @@
   "pixelWidth" : 2880,
   "region" : "window-content",
   "renderer" : "NSView.cacheDisplay",
-  "version" : "0.3.0"
+  "version" : "0.6.0"
 }

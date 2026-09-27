@@ -1,12 +1,13 @@
 # Roadmap
 
 Updated 2026-09-27. The [Japanese roadmap](roadmap.md) includes detailed acceptance criteria.
+The [current backlog](backlog.md) separates implementation work, known issues and maintainer actions.
 
 | Phase | Scope | Current state |
 | --- | --- | --- |
 | P0 | Requirements and Git | Complete |
 | P1 | Native MDI and independent processes | Implemented; manual interaction and VoiceOver remain |
-| P2 | Browsing and monitoring | Implemented; native display measurements pass; manual/environment checks remain |
+| P2 | Browsing and monitoring | View/column menus and pane-local recovery added in 0.6.0; disconnected/deleted-path distinction and manual/environment checks remain |
 | P3 | Projects, save ownership and recovery | Implemented through selection, viewport and history recovery; manual confirmations remain |
 | P4 | Create, rename, copy, move, trash, drag-and-drop, Undo | Integrity, AppKit, separate APFS volume and real disk-full tests pass; Finder, physical/network volumes and disconnection remain |
 | P5 | Performance, accessibility and OS qualification | Local performance budgets and 50 pane cycles pass; IME, VoiceOver, display environments and minimum OS remain |

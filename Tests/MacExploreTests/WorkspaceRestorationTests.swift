@@ -9,6 +9,206 @@ import ExplorerPlatform
 @Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["MACEXPLORE_TEST_APP"] != nil))
 @MainActor
 struct WorkspaceRestorationTests {
+    private func awaitCondition(_ predicate: @MainActor () -> Bool) async throws {
+        for _ in 0..<200 {
+            if predicate() { return }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        throw CocoaError(.userCancelled)
+    }
+
+    private func descendants(_ view: NSView) -> [NSView] {
+        [view] + view.subviews.flatMap(descendants)
+    }
+
+    private func click(_ title: String, in view: NSView) throws {
+        let button = try #require(descendants(view).compactMap { $0 as? NSButton }.first { $0.title == title })
+        try #require(button.isEnabled)
+        // performClick's animation can stop Swift's async-main run loop. Exercise
+        // the native action here; physical pointer/animation checks remain separate.
+        #expect(NSApp.sendAction(try #require(button.action), to: button.target, from: button))
+    }
+
+    @Test func viewCommandsPreserveSelectionAndIndependentPaneSettings() async throws {
+        _ = NSApplication.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let folder = root.appendingPathComponent("files")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        for name in ["a.txt", "b.txt", ".hidden.txt"] {
+            try Data(name.utf8).write(to: folder.appendingPathComponent(name))
+        }
+        let controller = WorkspaceWindowController(number: 1, directories: [folder], newWindow: {}, newInstance: {})
+        let store = ProjectStore(supportDirectory: root.appendingPathComponent("support"))
+        let project = WorkspaceProjectController(workspace: controller, store: store)
+        controller.project = project
+        defer {
+            controller.stopLoading(); project.release(); controller.close()
+            try? FileManager.default.removeItem(at: root)
+        }
+        controller.showWindow(nil)
+        let first = try #require(controller.activeBrowser)
+        controller.addPane(directory: folder)
+        let second = try #require(controller.activeBrowser)
+        try await awaitRows(first, 2)
+        try await awaitRows(second, 2)
+        second.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        let selected = second.selectedURLs
+        func items(_ menu: NSMenu) -> [NSMenuItem] {
+            menu.items + menu.items.flatMap { $0.submenu.map(items) ?? [] }
+        }
+        func invokeContext(_ command: AppCommand) throws -> NSMenuItem {
+            second.focusFiles()
+            let item = try #require(items(second.contextMenu()).first { $0.action != nil && $0.tag == command.rawValue })
+            #expect(second.validateMenuItem(item))
+            #expect(NSApp.sendAction(try #require(item.action), to: item.target, from: item))
+            return item
+        }
+        let descending = try invokeContext(.sortDescending)
+        try await awaitCondition { !second.loading }
+        #expect(second.selectedURLs == selected)
+        #expect(second.table.selectedRow == 1)
+        #expect(first.savedSettings.ascending && !second.savedSettings.ascending)
+        #expect(second.validateMenuItem(descending) && descending.state == .on)
+        let navigation = NSMenuItem(title: L10n.text(.navigationPane), action: nil, keyEquivalent: "")
+        second.performViewCommand(.toggleNavigation)
+        #expect(!second.savedSettings.showNavigation && first.savedSettings.showNavigation)
+        #expect(second.validateViewMenuItem(navigation, command: .toggleNavigation) == true && navigation.state == .off)
+        let tree = try #require(second.children.first as? FolderTreeController)
+        #expect(tree.view.isHidden)
+        _ = try invokeContext(.toggleHidden)
+        try await awaitRows(second, 3)
+        #expect(first.table.numberOfRows == 2 && !first.savedSettings.showHidden)
+        #expect(project.isDirty)
+        let saved = try await store.saveAs(project.snapshot(), to: root.appendingPathComponent("view.mexplore"))
+        await store.close(saved.handleID)
+        let decoded = try ProjectDocument.decode(Data(contentsOf: root.appendingPathComponent("view.mexplore")))
+        #expect(decoded.panes.first { $0.id == second.paneID }?.settings == second.savedSettings)
+        second.performViewCommand(.toggleNavigation)
+        #expect(second.savedSettings.showNavigation)
+    }
+
+    @Test func columnSheetRejectsInvalidInputAppliesOrderAndCancelsChanges() async throws {
+        _ = NSApplication.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let controller = WorkspaceWindowController(number: 1, directories: [root], newWindow: {}, newInstance: {})
+        defer { controller.stopLoading(); controller.close(); try? FileManager.default.removeItem(at: root) }
+        controller.showWindow(nil)
+        let window = try #require(controller.window), browser = try #require(controller.activeBrowser)
+        try await awaitRows(browser, 0)
+        let initial = browser.savedSettings.columns
+        browser.performViewCommand(.columnSettings)
+        try await awaitCondition { window.attachedSheet != nil }
+        let content = try #require(window.attachedSheet?.contentView)
+        let controls = descendants(content)
+        let nameWidth = try #require(controls.first { $0.accessibilityIdentifier() == "column-width-name" } as? NSTextField)
+        nameWidth.stringValue = "NaN"
+        nameWidth.delegate?.controlTextDidChange?(Notification(name: NSControl.textDidChangeNotification, object: nameWidth))
+        let apply = try #require(controls.compactMap { $0 as? NSButton }.first { $0.title == L10n.text(.apply) })
+        #expect(!apply.isEnabled)
+        try await awaitCondition {
+            window.attachedSheet.map { self.descendants($0.contentView!).compactMap { $0 as? NSTextField }.contains { $0.stringValue == L10n.text(.columnsInvalid) } } == true
+        }
+        #expect(browser.savedSettings.columns == initial)
+        nameWidth.stringValue = "420"
+        nameWidth.delegate?.controlTextDidChange?(Notification(name: NSControl.textDidChangeNotification, object: nameWidth))
+        for (index, column) in initial.enumerated() {
+            let order = try #require(controls.first { $0.accessibilityIdentifier() == "column-order-" + column.column.rawValue } as? NSPopUpButton)
+            order.selectItem(at: 3 - index)
+            #expect(NSApp.sendAction(try #require(order.action), to: order.target, from: order))
+            if index == 0 { #expect(!apply.isEnabled) } // Duplicate positions are rejected too.
+        }
+        #expect(apply.isEnabled)
+        try click(L10n.text(.apply), in: content)
+        try await awaitCondition { window.attachedSheet == nil && browser.savedSettings.columns.first?.column == .size }
+        #expect(browser.savedSettings.columns.map(\.column) == initial.reversed().map(\.column))
+        #expect(browser.savedSettings.columns.last?.width == 420)
+        let applied = browser.savedSettings
+        browser.performViewCommand(.columnSettings)
+        try await awaitCondition { window.attachedSheet != nil }
+        let cancelledContent = try #require(window.attachedSheet?.contentView)
+        let cancelledWidth = try #require(descendants(cancelledContent).first { $0.accessibilityIdentifier() == "column-width-name" } as? NSTextField)
+        cancelledWidth.stringValue = "800"
+        try click(L10n.text(.cancel), in: cancelledContent)
+        try await awaitCondition { window.attachedSheet == nil }
+        #expect(browser.savedSettings == applied)
+        browser.performViewCommand(.resetColumns)
+        #expect(browser.savedSettings.columns == initial)
+    }
+
+    @Test func unavailableFolderCanRetryOrReturnWithoutActingOnStaleRows() async throws {
+        _ = NSApplication.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let folder = root.appendingPathComponent("files"), missing = root.appendingPathComponent("missing")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("original".utf8).write(to: folder.appendingPathComponent("data.txt"))
+        let clipboard = NSPasteboard(name: .init(UUID().uuidString))
+        let operations = FileOperationController(supportDirectory: root.appendingPathComponent("support"), pasteboard: clipboard)
+        let controller = WorkspaceWindowController(number: 1, directories: [folder], newWindow: {}, newInstance: {})
+        controller.fileOperations = operations
+        defer { controller.stopLoading(); controller.close(); clipboard.releaseGlobally(); try? FileManager.default.removeItem(at: root) }
+        controller.showWindow(nil)
+        let browser = try #require(controller.activeBrowser)
+        try await awaitRows(browser, 1)
+        browser.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        browser.focusFiles()
+        operations.perform(.copyFiles, in: browser)
+        browser.navigate(to: missing)
+        try await awaitCondition { !browser.loading }
+        let errorView = try #require(descendants(browser.view).first { $0.accessibilityIdentifier() == "unavailable-\(browser.paneID)" })
+        let message = try #require(descendants(browser.view).first { $0.accessibilityIdentifier() == "location-error" } as? NSTextField)
+        #expect(!errorView.isHidden && browser.table.enclosingScrollView?.isHidden == true)
+        #expect(message.stringValue.contains(missing.path) && message.stringValue.contains("\n\n"))
+        #expect(!message.stringValue.contains("\\n"))
+        for command in [AppCommand.newFolder, .copyFiles, .pasteFiles, .renameItem, .trashFiles] {
+            #expect(!operations.canPerform(command, in: browser))
+        }
+        #expect(browser.tableView(browser.table, pasteboardWriterForRow: 0) == nil)
+        try click(L10n.text(.dismissLocationError), in: errorView)
+        #expect(errorView.isHidden && browser.directory == folder)
+        #expect(browser.selectedURLs.first?.lastPathComponent == "data.txt")
+        browser.navigate(to: missing)
+        try await awaitCondition { !browser.loading }
+        try FileManager.default.createDirectory(at: missing, withIntermediateDirectories: true)
+        try Data("reconnected".utf8).write(to: missing.appendingPathComponent("recovered.txt"))
+        try click(L10n.text(.retry), in: errorView)
+        try await awaitCondition { !browser.loading && browser.directory == missing }
+        #expect(errorView.isHidden && browser.readyItemCount == 1)
+        #expect(browser.savedSession.history.back == folder)
+        #expect(operations.canPerform(.newFolder, in: browser))
+    }
+
+    @Test func customPaneLayersFollowLightDarkLightChanges() async throws {
+        _ = NSApplication.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let controller = WorkspaceWindowController(number: 1, directories: [root], newWindow: {}, newInstance: {})
+        defer { controller.stopLoading(); controller.close(); try? FileManager.default.removeItem(at: root) }
+        controller.showWindow(nil)
+        let window = try #require(controller.window), browser = try #require(controller.activeBrowser)
+        try await awaitRows(browser, 0)
+        let layers = descendants(try #require(window.contentView)).compactMap { $0 as? FlippedView }
+            .filter { $0.semanticBackground != nil }
+        #expect(layers.count >= 3) // Workspace, browser and divider.
+        func colors() throws -> [NSColor] {
+            try layers.map { view in
+                let color = try #require(view.layer?.backgroundColor)
+                return try #require(NSColor(cgColor: color)?.usingColorSpace(.deviceRGB))
+            }
+        }
+        window.appearance = NSAppearance(named: .aqua)
+        window.display()
+        let light = try colors()
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.display()
+        try await awaitCondition { browser.view.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua }
+        let dark = try colors()
+        #expect(zip(light, dark).allSatisfy { $0 != $1 })
+        window.appearance = NSAppearance(named: .aqua)
+        window.display()
+        #expect(try colors() == light)
+    }
+
     private func awaitRows(_ browser: ExplorerBrowserController, _ count: Int) async throws {
         for _ in 0..<200 {
             if !browser.loading, browser.table.numberOfRows == count { return }

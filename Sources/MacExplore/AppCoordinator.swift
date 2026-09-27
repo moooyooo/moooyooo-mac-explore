@@ -99,7 +99,9 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         Task { await fileOperations.showRetainedOperations(in: current?.window, onlyIfPresent: true) }
         #if DEBUG
         if let index = arguments.firstIndex(of: "--capture-window"), arguments.indices.contains(index + 1) {
-            WindowCapture.start(to: URL(fileURLWithPath: arguments[index + 1]), workspace: { [weak self] in
+            WindowCapture.start(to: URL(fileURLWithPath: arguments[index + 1]),
+                                appearance: arguments.contains("--capture-dark") ? .darkAqua : .aqua,
+                                workspace: { [weak self] in
                 guard let self, self.opening.isEmpty, self.windows.count == 1 else { return nil }
                 return self.windows.first
             }, finish: { [weak self] in
@@ -211,6 +213,9 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
             return
         }
         switch command {
+        case .sortName, .sortModified, .sortKind, .sortSize, .sortAscending, .sortDescending,
+             .toggleHidden, .toggleNavigation, .columnSettings, .resetColumns, .home:
+            current?.activeBrowser?.performViewCommand(command)
         case .recoverFileOperations: Task { await fileOperations.showRetainedOperations(in: current?.window) }
         case .newFolder, .renameItem, .trashFiles, .copyFiles, .cutFiles, .pasteFiles, .undoFiles, .copyPath:
             fileOperations.perform(command, in: current?.activeBrowser)
@@ -263,6 +268,9 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         }
         if (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true { return false }
         guard let command = AppCommand(rawValue: menuItem.tag) else { return true }
+        if let enabled = current?.activeBrowser?.validateViewMenuItem(menuItem, command: command) {
+            return enabled && !terminating
+        }
         if textSelector(for: command) != nil, let editor = NSApp.keyWindow?.firstResponder as? NSTextView, editor.isEditable {
             if command == .undoFiles {
                 menuItem.title = editor.undoManager?.undoMenuItemTitle ?? L10n.text(.undo)
@@ -404,14 +412,28 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         add(edit, L10n.text(.selectAll), .selectAll, "a")
         add(edit, L10n.text(.copyPath), .copyPath)
         let view = menu(L10n.text(.menuView))
+        let sort = NSMenu(title: L10n.text(.sortBy))
+        let sortItem = NSMenuItem(title: sort.title, action: nil, keyEquivalent: "")
+        sortItem.submenu = sort; view.addItem(sortItem)
+        for (title, command) in BrowserViewMenu.sortItems { add(sort, L10n.text(title), command) }
+        sort.addItem(.separator())
+        add(sort, L10n.text(.sortAscending), .sortAscending)
+        add(sort, L10n.text(.sortDescending), .sortDescending)
+        add(view, L10n.text(.columnsMenu), .columnSettings)
+        add(view, L10n.text(.resetColumns), .resetColumns)
+        view.addItem(.separator())
+        add(view, L10n.text(.navigationPane), .toggleNavigation)
+        add(view, L10n.text(.hiddenItems), .toggleHidden)
+        view.addItem(.separator())
         add(view, L10n.text(.refresh), .refresh, "r")
         add(view, L10n.text(.searchFolder), .focusSearch, "f")
-        add(view, L10n.text(.toggleFavorite), .favorite)
         let go = menu(L10n.text(.menuGo))
         add(go, L10n.text(.back), .back, "[")
         add(go, L10n.text(.forward), .forward, "]")
         add(go, L10n.text(.parentFolder), .up, "\u{f700}")
         add(go, L10n.text(.goToPath), .focusAddress, "l")
+        add(go, L10n.text(.home), .home)
+        add(go, L10n.text(.toggleFavorite), .favorite)
         let window = menu(L10n.text(.menuWindow))
         add(window, L10n.text(.nextExplorer), .nextPane, "\t", .control)
         add(window, L10n.text(.previousExplorer), .previousPane, "\t", [.control, .shift])

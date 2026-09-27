@@ -1,6 +1,6 @@
 # File operations / ファイル操作
 
-0.5.0 development preview. Manual mouse/keyboard, Finder interoperability and
+0.6.0 development preview. Manual mouse/keyboard, Finder interoperability and
 physical removable/network-drive qualification are still pending. Use synthetic data for evaluation.
 
 ## 操作

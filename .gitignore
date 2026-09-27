@@ -12,6 +12,8 @@ xcuserdata/
 *.xcuserstate
 *.xcresult/
 *.dSYM/
+__pycache__/
+*.py[cod]
 
 # Distribution output
 dist/

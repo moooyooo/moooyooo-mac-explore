@@ -27,6 +27,8 @@ jobs:
           xcode-select -p
       - name: Check translations
         run: python3 scripts/check-localizations.py
+      - name: Check test completion detection
+        run: python3 -m unittest discover -s Tests/ScriptTests
       - name: Build app
         run: scripts/build-app.sh release
       - name: Test including real app processes and packaged languages

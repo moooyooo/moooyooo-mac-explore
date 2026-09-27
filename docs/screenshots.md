@@ -1,8 +1,8 @@
 # English and Japanese screenshots
 
-These images show version **0.3.0** using a generated project and synthetic files.
-They were captured and visually reviewed on **2026-09-26**, on macOS 26.5 / Apple
-M2 Max, using the light appearance. Both images are **2880 × 1576 pixels**.
+These images show version **0.6.0** using a generated project and synthetic files.
+They were captured and visually reviewed on **2026-09-27**, on macOS 26.5 / Apple
+M2 Max, in light and dark appearances. All four images are **2880 × 1576 pixels**.
 
 ## English
 
@@ -11,6 +11,12 @@ M2 Max, using the light appearance. Both images are **2880 × 1576 pixels**.
 ## 日本語
 
 ![日本語のワークスペース：左右に整列した2つのExplorer画面](images/workspace-ja.png)
+
+## Dark / ダーク
+
+![English workspace in dark appearance](images/workspace-en-dark.png)
+
+![日本語のダーク表示](images/workspace-ja-dark.png)
 
 日英とも実際のAppKit画面を描画して保存しています。ファイル・フォルダ・プロジェクト名は
 合成データなので共通です。言語を変えてもユーザーが付けた名前は翻訳しません。
@@ -31,11 +37,13 @@ home paths, project history or credentials are included.
 
 [English metadata](images/workspace-en.json) and [Japanese metadata](images/workspace-ja.json)
 record language, dimensions, rendering method, appearance and pane count.
+[English dark metadata](images/workspace-en-dark.json) and
+[Japanese dark metadata](images/workspace-ja-dark.json) record the dark exports.
 Their menu titles describe the running app but are not shown in the PNGs.
 No post-capture compositing, redrawing or image generation was applied.
 
 These images do not verify mouse/keyboard behavior, menu interaction, native file
-dialogs, IME, VoiceOver, dark appearance or other display scales. Those checks
+dialogs, IME, VoiceOver or other display scales. Those checks
 remain on the [roadmap](roadmap.en.md).
 
 ## Reproduce
@@ -43,23 +51,23 @@ remain on the [roadmap](roadmap.en.md).
 From a macOS GUI session with the project's build prerequisites installed:
 
 ```sh
-python3 scripts/capture-screenshots.py --output .local/screenshots
+python3 scripts/capture-screenshots.py --output .local/screenshots --appearance both
 ```
 
 The script:
 
 1. Builds a separate debug app under `build/capture/`.
 2. Generates a temporary project using [`create-demo.py`](../scripts/create-demo.py).
-3. Starts one English and then one Japanese process with isolated recovery data.
+3. Starts English and Japanese processes sequentially for each appearance, with isolated recovery data.
 4. Waits for directory loading, exports PNG/JSON pairs, and closes its own processes.
-5. Removes the temporary fixture after both exports finish.
+5. Removes the temporary fixture after all exports finish.
 
 Existing PNG/JSON files are never overwritten; choose a fresh `--output` directory
 for another run. Pixel dimensions can vary with display scale and available screen
-size. Temporary folder identifiers vary. Review both outputs before replacing the
+size. Temporary folder identifiers vary. Review all outputs before replacing the
 published images.
 
-`--capture-window` is compiled only in debug builds. Release verification checks
+`--capture-window` and `--capture-dark` are compiled only in debug builds. Release verification checks
 that this flag is absent from the distributed executable. The capture script passes
 `MACEXPLORE_APP_OUTPUT` to the build script to keep its debug bundle separate from
 the normal release bundle. It reads no desktop or other application's screen content.

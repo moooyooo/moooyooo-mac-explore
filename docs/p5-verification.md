@@ -1,7 +1,8 @@
 # P5 quality and performance verification
 
-Updated 2026-09-27. Version 0.5.0 is a development preview. P5 remains in progress
+Updated 2026-09-27. Versions 0.5.0/0.6.0 are development previews. P5 remains in progress
 because manual input, accessibility, display and supported-OS checks are outstanding.
+The measurements below are the 0.5.0 baseline. The final section records 0.6.0.
 
 ## Functional additions
 
@@ -114,3 +115,39 @@ this hardware, not guarantees for all Macs or storage devices.
 Computer Use was retried on 2026-09-27 and still reports pending Accessibility/Screen
 Recording permissions. Automated AppKit actions and content-rendered screenshots
 do not constitute verification of those missing desktop interactions.
+
+## 0.6.0 follow-up: view controls and unavailable folders
+
+Implemented and tested: per-pane sort/hidden/navigation commands, column order/width
+validation, Apply/Cancel/reset, saved configuration, version-1 projects without the
+new navigation preference, retry/return after a missing folder, and disabled file
+commands/drag sources while stale rows are hidden.
+Custom layer backgrounds are checked through light → dark → light on the same
+native views. The folder picker retains the pane that originally opened it.
+
+The final 0.6.0 Release bundle passed metadata, arm64, English/Japanese resources,
+license and ad-hoc-signature checks. `scripts/test.sh --integration` completed in
+8.457 seconds: **86 declared, 80 executed successfully, six opt-in volume/performance
+tests skipped**. All eight WorkspaceRestorationTests and all three FileOperationUITests
+finished. This includes relocated packaged apps and real project-owner processes.
+Translation checks cover 236 keys. Three Python tests verify the completion gate.
+The separate APFS and full performance suites were not repeated for these UI changes;
+their 0.5.0 results above remain the last measurements.
+
+During this work, a test run could exit 0 after only some tests completed.
+A temporary exit-stack trace showed `swift_task_asyncMainDrainQueue` returning.
+This matches the failure described in
+[swiftlang/swift#91716](https://github.com/swiftlang/swift/issues/91716);
+the attribution to that runtime issue is an inference from the matching stack and symptoms.
+Invoking AppKit button actions through `NSApp.sendAction` instead of the animated
+`performClick` path allowed the whole suite to complete. These are native action
+tests, not physical pointer events. Temporary tracing was removed.
+
+`scripts/test.sh` now requires a successful final Swift Testing total in addition
+to exit status 0. Tests for the checker reject an individual-test success or an
+incomplete log; info/list commands do not require an execution total.
+
+Four normal-workspace [captures](screenshots.md), Japanese/English × light/dark,
+were visually reviewed at 2880×1576 using neutral synthetic fixtures. They do not
+cover menus, sheets, physical screen-scale changes or VoiceOver. See the
+[backlog](backlog.md) for remaining implementation, qualification and maintainer actions.
