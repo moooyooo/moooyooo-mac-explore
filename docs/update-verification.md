@@ -23,6 +23,17 @@
   明示的な`--diagnostics-file`指定時だけ、終了要求を受けた時点の処理中・未保存・
   シート表示の件数を別ファイルへ記録する。通常起動では記録せず、ファイル名やパスも出力しない。
 
+## ホストCI
+
+[診断追加後のCI](https://github.com/moooyooo/moooyooo-mac-explore/actions/runs/36366628433)で、
+macOS 14・26ともビルド、統合試験、別APFSボリューム、実更新、開発版アーカイブ検証が成功。
+使い捨てアプリによる署名付き更新・改ざん拒否も両OSで実行した。
+
+[最初の実行](https://github.com/moooyooo/moooyooo-mac-explore/actions/runs/36365828284)では
+macOS 14は成功し、macOS 26で2番目の読み取り専用プロセスの通常終了待ちが1回失敗した。
+ローカルの単独・全体実行と上記の再実行では再現しておらず、原因は未特定。
+終了条件を緩めず診断を追加した。解消済みとはせず、[I-06](backlog.md)で追跡する。
+
 ## 実際のSparkle更新
 
 `python3 scripts/test-updates.py`で固有Bundle IDの使い捨てアプリと鍵を生成した。
