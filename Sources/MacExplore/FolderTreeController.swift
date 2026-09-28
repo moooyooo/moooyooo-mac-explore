@@ -54,11 +54,12 @@ final class FolderTreeController: NSViewController, NSOutlineViewDataSource, NSO
         scroll.borderType = .bezelBorder
     }
 
-    func configure(expanded urls: [URL], favorites: [URL], showHidden: Bool) {
+    func configure(expanded urls: [URL], favorites: [URL], showHidden: Bool,
+                   homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) {
         _ = view
         stop()
         expanded = Set(urls); self.favorites = favorites; hidden = showHidden
-        let home = FileManager.default.homeDirectoryForCurrentUser
+        let home = homeDirectory
         roots = [FolderNode(home, name: L10n.text(.home)), FolderNode(home.appendingPathComponent("Downloads"), name: L10n.text(.downloads))]
         roots += favorites.map { FolderNode($0, name: "★ " + $0.lastPathComponent) }
         roots += [FolderNode(URL(fileURLWithPath: "/"), name: L10n.text(.computer)), FolderNode(URL(fileURLWithPath: "/Volumes"), name: L10n.text(.volumes))]
@@ -97,19 +98,41 @@ final class FolderTreeController: NSViewController, NSOutlineViewDataSource, NSO
                 let entries = try await DirectoryReader.read(url, showHidden: showHidden)
                 guard !Task.isCancelled, let self, let node else { return }
                 let old = Dictionary((node.children ?? []).compactMap { child in child.url.map { ($0, child) } }, uniquingKeysWith: { a, _ in a })
-                node.children = entries.filter(\.isBrowsable).map { old[$0.url] ?? FolderNode($0.url) }
-                self.reloading = true
-                self.outline.reloadItem(node, reloadChildren: true)
-                self.restoreExpansion(node.children ?? [])
-                self.reloading = false
                 node.task = nil
+                self.replaceChildren(entries.filter(\.isBrowsable).map { old[$0.url] ?? FolderNode($0.url) }, of: node)
             } catch {
                 guard !Task.isCancelled, let self, let node else { return }
-                node.children = [FolderNode(nil, name: L10n.text(.treeOpenFailed))]
-                self.outline.reloadItem(node, reloadChildren: true)
                 node.task = nil
+                self.replaceChildren([FolderNode(nil, name: L10n.text(.treeOpenFailed))], of: node)
             }
         }
+    }
+
+    private func replaceChildren(_ children: [FolderNode], of node: FolderNode) {
+        // Most refreshes only change files or metadata. Rebuilding unchanged tree
+        // rows clears native descendant selection and produces visible flicker.
+        if let previous = node.children, previous.count == children.count,
+           zip(previous, children).allSatisfy({ $0.url == $1.url && $0.name == $1.name }) { return }
+        let selected = outline.item(atRow: outline.selectedRow)
+        let clip = scroll.contentView
+        let origin = clip.bounds.origin
+        let firstVisible = outline.rows(in: outline.visibleRect).location
+        let anchor = firstVisible >= 0 && firstVisible < outline.numberOfRows ? outline.item(atRow: firstVisible) : nil
+        let offset = anchor == nil ? 0 : origin.y - outline.rect(ofRow: firstVisible).minY
+        let previousReloading = reloading
+        reloading = true
+        defer { reloading = previousReloading }
+        node.children = children
+        outline.reloadItem(node, reloadChildren: true)
+        restoreExpansion(children)
+        let selectedRow = selected.map { outline.row(forItem: $0) } ?? -1
+        if selectedRow >= 0 { outline.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false) }
+        else { outline.deselectAll(nil) }
+        let anchorRow = anchor.map { outline.row(forItem: $0) } ?? -1
+        let y = anchorRow >= 0 ? outline.rect(ofRow: anchorRow).minY + offset : origin.y
+        let proposed = NSRect(origin: NSPoint(x: origin.x, y: y), size: clip.bounds.size)
+        clip.scroll(to: clip.constrainBoundsRect(proposed).origin)
+        scroll.reflectScrolledClipView(clip)
     }
 
     func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int { (item as? FolderNode)?.children?.count ?? (item == nil ? roots.count : 1) }

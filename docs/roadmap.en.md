@@ -1,5 +1,9 @@
 # Roadmap
 
+0.7.1 adds the application icon and preserves sidebar selection/scrolling during refresh.
+The original report of visual shaking still needs confirmation in the user's workspace;
+see [verification and scope](releases/0.7.1.md).
+
 Updated 2026-09-28. The [Japanese roadmap](roadmap.md) includes detailed acceptance criteria.
 The [current backlog](backlog.md) separates implementation work, known issues and maintainer actions.
 

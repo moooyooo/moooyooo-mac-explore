@@ -3,6 +3,7 @@
 | Component | Origin | Distribution |
 | --- | --- | --- |
 | Application source, translations, documentation and synthetic examples | This repository, maintained by moooyooo | [MIT](LICENSE) |
+| Application icon | Original artwork generated for this project with OpenAI's built-in image generation tool; no reference images supplied | PNG master and ICNS distributed under [MIT](LICENSE); [prompt and reproduction](docs/app-icon.md) |
 | Swift, Foundation, AppKit, CoreServices and UniformTypeIdentifiers | Apple / Swift toolchain and macOS SDK | Linked system frameworks; their licenses are separate from this project's MIT license |
 | Toolbar symbols | SF Symbols requested through `NSImage(systemSymbolName:…)` | Resolved by macOS at runtime; no extracted symbol artwork is included |
 | File and folder icons | `NSWorkspace` on the user's Mac | Resolved at runtime; no third-party icon set is copied into this repository |

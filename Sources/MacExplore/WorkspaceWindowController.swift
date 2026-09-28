@@ -182,9 +182,10 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         browser.onLocationChange = { [weak self] url in
             guard let self else { return }
             let old = self.state.panes.first { $0.id == id }?.directory
+            guard old != url else { return }
             self.state.setDirectory(url, for: id)
             self.render()
-            if old != url { self.changed() }
+            self.changed()
         }
         browser.onSettingsChange = { [weak self] in self?.changed() }
         browser.onSessionChange = { [weak self] in self?.onSessionChange?() }
@@ -373,8 +374,11 @@ final class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
             guard let pane = state.panes.first(where: { $0.id == id }), let view = chrome[id] else { continue }
             view.isHidden = pane.presentation == .minimized
             view.update(pane, active: state.activePaneID == id)
-            canvas.addSubview(view, positioned: .above, relativeTo: nil)
         }
+        let ordered: [NSView] = [emptyMessage] + state.zOrder.compactMap { chrome[$0] }
+        // Reorder retained views once, only when the stacking order actually changes.
+        // Navigation and filesystem refreshes must not reshuffle every Explorer.
+        if !canvas.subviews.elementsEqual(ordered, by: { $0 === $1 }) { canvas.subviews = ordered }
         emptyMessage.isHidden = state.panes.contains { $0.presentation != .minimized }
         let minimized = state.panes.filter { $0.presentation == .minimized }
         if minimized.map(\.id) != shelfIDs {

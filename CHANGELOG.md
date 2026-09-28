@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.1 — development preview (2026-09-28)
+
+- Add a dedicated blue-window and gold-folder application icon with standard and Retina sizes.
+- Keep the selected folder and scroll anchor when sidebar children change; clear
+  removed selections without navigating to a different row.
+- Avoid rebuilding unchanged sidebar rows and reshuffling MDI panes on every refresh.
+- Add native sidebar mouse-event verification in an isolated debug app, plus
+  regression tests for selection, scrolling, focus and settled layouts.
+
 ## 0.7.0 — development preview (2026-09-28)
 
 - Add Sparkle 2.10.0 and English/Japanese menus for manual and opt-in automatic updates.

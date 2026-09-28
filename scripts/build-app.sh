@@ -16,6 +16,7 @@ mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources/Licenses" "$app_
 cp "$binary_dir/MacExplore" "$app_dir/Contents/MacOS/MacExplore.new"
 mv -f "$app_dir/Contents/MacOS/MacExplore.new" "$app_dir/Contents/MacOS/MacExplore"
 cp Resources/Info.plist "$app_dir/Contents/Info.plist"
+cp Resources/AppIcon.icns "$app_dir/Contents/Resources/AppIcon.icns"
 cp LICENSE THIRD_PARTY_NOTICES.md "$app_dir/Contents/Resources/"
 cp Licenses/Sparkle.txt "$app_dir/Contents/Resources/Licenses/"
 ditto "$binary_dir/Sparkle.framework" "$app_dir/Contents/Frameworks/Sparkle.framework"

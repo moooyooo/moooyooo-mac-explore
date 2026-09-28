@@ -17,6 +17,18 @@ binary = app / "Contents/MacOS" / info["CFBundleExecutable"]
 assert binary.is_file()
 assert {p.name for p in binary.parent.iterdir()} == {"MacExplore"}, "Unexpected bundled executable"
 resources = app / "Contents/Resources"
+assert info["CFBundleIconFile"] == "AppIcon.icns"
+icon = (resources / info["CFBundleIconFile"]).read_bytes()
+assert icon[:4] == b"icns" and int.from_bytes(icon[4:8], "big") == len(icon), "Invalid app icon"
+icon_types = set()
+offset = 8
+while offset < len(icon):
+    length = int.from_bytes(icon[offset + 4:offset + 8], "big")
+    assert length >= 8 and offset + length <= len(icon), "Invalid icon representation"
+    icon_types.add(icon[offset:offset + 4])
+    offset += length
+assert {b"ic07", b"ic08", b"ic09", b"ic10", b"ic11", b"ic12", b"ic13", b"ic14"} <= icon_types, \
+    "Missing standard or Retina icon sizes"
 for name in ("LICENSE", "THIRD_PARTY_NOTICES.md"):
     assert (resources / name).is_file(), f"Missing {name}"
 assert (resources / "Licenses/Sparkle.txt").is_file()
@@ -51,8 +63,8 @@ for language in ("en", "ja"):
 # Avoid shipping the developer's home/build path (including SwiftPM's generated fallback).
 strings = subprocess.check_output(["strings", str(binary)])
 assert b"/Users/" not in strings and b"/home/" not in strings, "Developer path found in release executable"
-assert all(flag not in strings for flag in (b"--capture-window", b"--capture-dark")), \
-    "Documentation capture commands must not ship in a release executable"
+assert all(flag not in strings for flag in (b"--capture-window", b"--capture-dark", b"--verify-sidebar")), \
+    "Debug capture and verification commands must not ship in a release executable"
 subprocess.run(["codesign", "--verify", "--strict", "--deep", str(app)], check=True)
 architectures = subprocess.check_output(["lipo", "-archs", str(binary)], text=True).strip()
 print(f"App verified: {info['CFBundleShortVersionString']} ({info['CFBundleVersion']}), {architectures}, en/ja, bundled licenses.")
