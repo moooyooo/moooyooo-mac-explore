@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.2 — development preview (2026-09-28)
+
+- Open directory symbolic links, including the startup disk under Volumes.
+- Preserve the entered link path in the address, child entries and navigation history.
+- Add tests for absolute, relative, chained, broken and cyclic directory links,
+  plus linked-volume tree expansion and back navigation.
+
 ## 0.7.1 — development preview (2026-09-28)
 
 - Add a dedicated blue-window and gold-folder application icon with standard and Retina sizes.

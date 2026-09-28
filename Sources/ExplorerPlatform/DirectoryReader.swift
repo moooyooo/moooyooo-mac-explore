@@ -27,8 +27,11 @@ public enum DirectoryReader {
             let keys: Set<URLResourceKey> = [
                 .isDirectoryKey, .isPackageKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey,
             ]
+            // Foundation's URL enumerator rejects a symbolic link as its root
+            // (including /Volumes/Macintosh HD -> /). Resolve only for reading;
+            // keep the user's alias path in entries, navigation and file actions.
             let urls = try FileManager.default.contentsOfDirectory(
-                at: directory, includingPropertiesForKeys: Array(keys),
+                at: directory.resolvingSymlinksInPath(), includingPropertiesForKeys: Array(keys),
                 options: showHidden ? [] : [.skipsHiddenFiles]
             )
             var result: [FileEntry] = []
@@ -39,7 +42,8 @@ public enum DirectoryReader {
                 guard let values = try? url.resourceValues(forKeys: keys) else { continue }
                 let target = values.isSymbolicLink == true ? try? url.resolvingSymlinksInPath().resourceValues(forKeys: [.isDirectoryKey, .isPackageKey]) : nil
                 result.append(FileEntry(
-                    url: url, name: url.lastPathComponent,
+                    url: directory.appendingPathComponent(url.lastPathComponent, isDirectory: url.hasDirectoryPath),
+                    name: url.lastPathComponent,
                     isDirectory: (target?.isDirectory ?? values.isDirectory) == true,
                     isPackage: (target?.isPackage ?? values.isPackage) == true,
                     isSymbolicLink: values.isSymbolicLink == true,

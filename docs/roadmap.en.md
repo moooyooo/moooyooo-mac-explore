@@ -1,5 +1,8 @@
 # Roadmap
 
+0.7.2 fixes browsing directory symbolic links, including the startup disk under Volumes.
+See the [release record](releases/0.7.2.md).
+
 0.7.1 adds the application icon and preserves sidebar selection/scrolling during refresh.
 The user confirmed that the file-list/tree shaking was resolved in the installed
 0.7.1 app; I-07 is closed. See [verification and scope](releases/0.7.1.md).

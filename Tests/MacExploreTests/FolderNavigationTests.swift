@@ -169,4 +169,41 @@ struct FolderNavigationTests {
         #expect(abs(newOffset - offset) < 0.5)
         #expect(tree.selectedURL == selected)
     }
+
+    @Test func linkedVolumeExpandsAndNavigatesWithoutLosingItsAliasPath() async throws {
+        _ = NSApplication.shared
+        let manager = FileManager.default
+        let root = manager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let disk = root.appendingPathComponent("Disk")
+        let volumes = root.appendingPathComponent("Volumes")
+        let initial = root.appendingPathComponent("Initial")
+        let link = volumes.appendingPathComponent("Macintosh HD")
+        for folder in [disk.appendingPathComponent("Documents"), volumes, initial] {
+            try manager.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        try Data("report".utf8).write(to: disk.appendingPathComponent("report.txt"))
+        try Data("notes".utf8).write(to: disk.appendingPathComponent("Documents/notes.txt"))
+        try manager.createSymbolicLink(at: link, withDestinationURL: disk)
+        let workspace = WorkspaceWindowController(number: 1, directories: [initial], newWindow: {}, newInstance: {})
+        workspace.showWindow(nil)
+        defer { workspace.stopLoading(); workspace.close(); try? manager.removeItem(at: root) }
+        let browser = try #require(workspace.activeBrowser)
+        let tree = try #require(browser.children.first as? FolderTreeController)
+        tree.configure(expanded: [volumes], favorites: [volumes], showHidden: false)
+        try await awaitCondition { !browser.loading && tree.outline.numberOfRows == 6 }
+        let volumeRoot = tree.outlineView(tree.outline, child: 2, ofItem: nil)
+        let volume = tree.outlineView(tree.outline, child: 0, ofItem: volumeRoot)
+        tree.outline.expandItem(volume)
+        try await awaitCondition { tree.outline.numberOfRows == 7 }
+        tree.outline.selectRowIndexes(IndexSet(integer: tree.outline.row(forItem: volume)), byExtendingSelection: false)
+        try await awaitCondition { browser.readyItemCount == 2 }
+        #expect(browser.directory.path == link.path)
+        let documents = tree.outlineView(tree.outline, child: 0, ofItem: volume)
+        tree.outline.selectRowIndexes(IndexSet(integer: tree.outline.row(forItem: documents)), byExtendingSelection: false)
+        try await awaitCondition { browser.readyItemCount == 1 }
+        #expect(browser.directory.path == link.appendingPathComponent("Documents").path)
+        browser.goBack()
+        try await awaitCondition { browser.readyItemCount == 2 }
+        #expect(browser.directory.path == link.path)
+    }
 }

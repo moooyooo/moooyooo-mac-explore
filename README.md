@@ -8,7 +8,7 @@ A lightweight native macOS file manager with Windows Explorer-inspired controls.
 Arrange multiple Explorer panes inside an MDI window, keep several workspaces open,
 launch independent app processes, and save each workspace as a project.
 
-**0.7.1 development preview.** Browsing, projects, session recovery, basic file operations and signed update support are implemented.
+**0.7.2 development preview.** Browsing, projects, session recovery, basic file operations and signed update support are implemented.
 File operations have synthetic-data, native AppKit and separate APFS volume tests;
 manual/Finder and physical removable/network-drive qualification remain open.
 See [file operations and limits](docs/file-operations.md).
@@ -189,7 +189,7 @@ processes editing the same project must use the same support directory.
 
 - [Contributing](CONTRIBUTING.md), [security reporting](SECURITY.md)
 - [Release preparation and packaging](docs/releasing.md)
-- [0.7.1 development release notes](docs/releases/0.7.1.md)
+- [0.7.2 development release notes](docs/releases/0.7.2.md)
 - [Current TODOs, issues and maintainer actions](docs/backlog.md)
 - [Requirements](docs/requirements.md), [UX](docs/ux.md), [architecture](docs/architecture.md),
   [project format](docs/projects.md) (detailed design documents currently in Japanese)
