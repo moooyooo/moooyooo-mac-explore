@@ -1,0 +1,47 @@
+{
+  "cache" : "Warm local filesystem; generated small UTF-8 text files",
+  "configuration" : "release",
+  "cpu" : "Apple M2 Max",
+  "hardwareModel" : "Mac14,6",
+  "items1000" : {
+    "budgetSeconds" : 0.29999999999999999,
+    "p95Seconds" : 0.046668458264321089,
+    "seconds" : [
+      0.046668458264321089,
+      0.046315333340317011,
+      0.046001041773706675,
+      0.043695083353668451,
+      0.044652249664068222,
+      0.046402291394770145,
+      0.044990916736423969,
+      0.046303958632051945,
+      0.044136208482086658,
+      0.044219666626304388
+    ]
+  },
+  "items10000" : {
+    "budgetSeconds" : 1,
+    "p95Seconds" : 0.15943312458693981,
+    "seconds" : [
+      0.15571295842528343,
+      0.15509245824068785,
+      0.15943312458693981,
+      0.15417975001037121,
+      0.15754749998450279,
+      0.15763566689565778,
+      0.15802574995905161,
+      0.15774912526831031,
+      0.15701262466609478,
+      0.15639750007539988
+    ]
+  },
+  "items100000" : {
+    "maximumMainActorHeartbeatGapSeconds" : 0.052188124973326921,
+    "seconds" : 1.3443337087519467,
+    "testProcessPhysicalFootprintBytes" : 171787200
+  },
+  "language" : "ja",
+  "os" : "Version 26.5 (Build 25F71)",
+  "physicalMemoryBytes" : 68719476736,
+  "scope" : "Path confirmation through sorted native table layout and drawing submission"
+}

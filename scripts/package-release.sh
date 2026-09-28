@@ -42,9 +42,7 @@ staged_app="$stage/Moooyooo Mac Explore.app"
 ditto "$app_dir" "$staged_app"
 
 if [[ "$mode" == "--notarize" ]]; then
-    # No nested executables or external frameworks are bundled; do not use --deep signing.
-    codesign --force --options runtime --timestamp --sign "$MACEXPLORE_SIGN_IDENTITY" "$staged_app"
-    codesign --verify --strict --verbose=2 "$staged_app"
+    scripts/sign-app.sh "$staged_app" "$MACEXPLORE_SIGN_IDENTITY"
     ditto -c -k --sequesterRsrc --keepParent "$staged_app" "$stage/submission.zip"
     mkdir -p .local/notarization
     report="$project_dir/.local/notarization/$name.json"

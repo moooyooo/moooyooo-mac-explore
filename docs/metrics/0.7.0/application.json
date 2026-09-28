@@ -1,0 +1,48 @@
+{
+  "appBytes" : 5300612,
+  "applicationLanguage" : "en",
+  "concurrentProcessPhysicalFootprintTotalBytes" : 134154016,
+  "configuration" : "release",
+  "cpu" : "Apple M2 Max",
+  "hardwareModel" : "Mac14,6",
+  "idleCPUPercentByProcess" : [
+    0,
+    0.016464895207263051
+  ],
+  "idleCPUPercentTotal" : 0.016464895207263051,
+  "idleSeconds" : 60.735278749838471,
+  "itemsPerPane" : 1000,
+  "language" : "ja",
+  "os" : "Version 26.5 (Build 25F71)",
+  "physicalMemoryBytes" : 68719476736,
+  "scope" : "Release .app via NSWorkspace; request through native table drawing submission",
+  "singlePanePhysicalFootprintBytes" : 37766008,
+  "singlePanePhysicalFootprintSamplesBytes" : [
+    38191968,
+    38126432,
+    37520224,
+    37716808,
+    37552992,
+    37602144,
+    37536632,
+    37471048,
+    37323616,
+    37307232
+  ],
+  "sixPaneDataset" : "Six distinct directories, three panes in each of two project windows",
+  "sixPanePhysicalFootprintBytes" : 96388008,
+  "warmLaunchP95Seconds" : 0.41266037477180362,
+  "warmLaunchSeconds" : [
+    0.3915224582888186,
+    0.39289416652172804,
+    0.41036254167556763,
+    0.39952441630885005,
+    0.38042970839887857,
+    0.4034999581053853,
+    0.41266037477180362,
+    0.40230045840144157,
+    0.39868687465786934,
+    0.39034041669219732
+  ],
+  "warmupLaunchesExcluded" : 1
+}

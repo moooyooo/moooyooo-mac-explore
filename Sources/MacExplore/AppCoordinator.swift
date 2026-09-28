@@ -6,6 +6,14 @@ import ExplorerPlatform
 @objc(ExplorerApplication)
 final class ExplorerApplication: NSApplication {
     override func sendEvent(_ event: NSEvent) {
+        if (delegate as? AppCoordinator)?.freezesInputForUpdate == true {
+            switch event.type {
+            case .keyDown, .keyUp, .leftMouseDown, .leftMouseUp, .leftMouseDragged,
+                 .rightMouseDown, .rightMouseUp, .rightMouseDragged, .otherMouseDown,
+                 .otherMouseUp, .otherMouseDragged, .scrollWheel: return
+            default: break
+            }
+        }
         if event.type == .keyDown, (delegate as? AppCoordinator)?.handleKey(event) == true { return }
         super.sendEvent(event)
     }
@@ -36,6 +44,10 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     private var fileOperations = FileOperationController()
     private var shortcutPreset = ShortcutSettings.argument() ?? ShortcutSettings.preference()
     private var usesShortcutOverride = ShortcutSettings.argument() != nil
+    private var updateStore: UpdateSessionStore?
+    private var updates: UpdateController?
+    private var starting = false
+    private(set) var freezesInputForUpdate = false
 
     init(startTime: TimeInterval) { self.startTime = startTime }
 
@@ -46,7 +58,8 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
-        buildMenus()
+        starting = true
+        freezesInputForUpdate = true
         let arguments = Array(CommandLine.arguments.dropFirst())
         var folders: [URL] = []
         var supportDirectory: URL?
@@ -78,25 +91,64 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         if let shortcuts = ShortcutSettings.argument() { instanceArguments += ["--shortcuts", shortcuts.rawValue] }
         let session = SessionStore(instanceID: instanceID, supportDirectory: supportDirectory)
         sessionStore = session
+        let updateStore = UpdateSessionStore(bundleURL: Bundle.main.bundleURL, supportDirectory: supportDirectory)
+        self.updateStore = updateStore
+        let updates = UpdateController(store: updateStore,
+            enabled: supportDirectory == nil,
+            isBusy: { [weak self] in
+                guard let self else { return true }
+                return self.starting || self.terminating || self.fileOperations.isBusy || !self.opening.isEmpty ||
+                    self.windows.contains { $0.project?.isBusy == true || $0.window?.attachedSheet != nil }
+            }, snapshot: { [weak self] in self?.updateSnapshot() ?? [] },
+            showError: { [weak self] error in
+                Task { await self?.showError(error, title: L10n.text(.updatesTitle)) }
+            })
+        self.updates = updates
+        buildMenus()
         Task {
-            do { try await session.start(); sessionReady = true; scheduleRecovery() }
-            catch { await showError(error, title: L10n.text(.recoverySaveFailed)) }
+            do {
+                let restart = try await updateStore.register(
+                    build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "")
+                try await session.start()
+                sessionReady = true
+                if let restart {
+                    for saved in restart.workspaces {
+                        let controller = createWindow(directories: [])
+                        try await controller.project?.resumeAfterUpdate(saved)
+                        try controller.restoreBrowserSessions(saved.workspace.browserStates ?? [])
+                    }
+                    try await session.update(recoverySnapshot())
+                    try await updateStore.finishRestart()
+                }
+                if folders.isEmpty { folders = [FileManager.default.homeDirectoryForCurrentUser] }
+                if restart == nil {
+                    if arguments.contains("--demo") {
+                        let demo = (0..<3).map { folders[$0 % folders.count] }
+                        createWindow(directories: demo)
+                        createWindow(directories: demo)
+                    } else if pendingProjectURLs.isEmpty { createWindow(directories: folders) }
+                }
+                launched = true; starting = false; freezesInputForUpdate = false
+                let projects = pendingProjectURLs; pendingProjectURLs = []
+                for url in projects { await openProject(url) }
+                scheduleRecovery()
+                updates.start()
+                await fileOperations.showRetainedOperations(in: current?.window, onlyIfPresent: true)
+            } catch {
+                freezesInputForUpdate = false
+                await showError(error, title: L10n.text(.updatesTitle))
+                // A partially restored session stays recoverable. Do not consume the
+                // restart marker or enter normal browsing after admission failed.
+                starting = true
+                NSApp.terminate(nil)
+                return
+            }
             await refreshRecentMenu()
         }
-        if folders.isEmpty { folders = [FileManager.default.homeDirectoryForCurrentUser] }
-        if arguments.contains("--demo") {
-            let demo = (0..<3).map { folders[$0 % folders.count] }
-            createWindow(directories: demo)
-            createWindow(directories: demo)
-        } else if pendingProjectURLs.isEmpty { createWindow(directories: folders) }
-        launched = true
-        let projects = pendingProjectURLs; pendingProjectURLs = []
-        for url in projects { Task { await openProject(url) } }
         workspaceObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didMountNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.windows.forEach { $0.reloadBrowsers() } }
         }
         NSApp.activate(ignoringOtherApps: true)
-        Task { await fileOperations.showRetainedOperations(in: current?.window, onlyIfPresent: true) }
         #if DEBUG
         if let index = arguments.firstIndex(of: "--capture-window"), arguments.indices.contains(index + 1) {
             WindowCapture.start(to: URL(fileURLWithPath: arguments[index + 1]),
@@ -144,11 +196,13 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard !starting, !terminating else { return false }
         if !flag { createWindow() }
         return true
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        updates?.stop()
         sessionTask?.cancel()
         if let workspaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(workspaceObserver) }
         for controller in windows { controller.stopLoading() }
@@ -160,17 +214,44 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     }
 
     func application(_ sender: NSApplication, open urls: [URL]) {
+        guard !terminating else { return }
         if !launched { pendingProjectURLs += urls; return }
         for url in urls { Task { await openProject(url) } }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if starting { return .terminateNow }
         if fileOperations.isBusy {
-            fileOperations.explainPendingOperation(in: current?.window)
+            let operationWindow = windows.first(where: { $0.window?.attachedSheet != nil })?.window
+                ?? current?.window
+                ?? windows.first?.window
+            fileOperations.explainPendingOperation(in: operationWindow)
             return .terminateCancel
         }
         guard !terminating else { return .terminateCancel }
         guard !windows.contains(where: { $0.project?.isBusy == true || $0.window?.attachedSheet != nil }) else { return .terminateCancel }
+        guard opening.isEmpty, updates?.isChecking != true else {
+            Task { await showError(UpdateController.busyError, title: L10n.text(.updatesTitle)) }
+            return .terminateCancel
+        }
+        if let target = updates?.targetBuild, updates?.ownsUpdate == true, let updateStore {
+            terminating = true; freezesInputForUpdate = true
+            sessionTask?.cancel()
+            let snapshot = updateSnapshot()
+            Task {
+                do {
+                    try await updateStore.prepareRestart(targetBuild: target, workspaces: snapshot)
+                    try? await sessionStore?.finish()
+                    sender.reply(toApplicationShouldTerminate: true)
+                } catch {
+                    terminating = false; freezesInputForUpdate = false
+                    scheduleRecovery()
+                    sender.reply(toApplicationShouldTerminate: false)
+                    await showError(error, title: L10n.text(.updateSaveFailed))
+                }
+            }
+            return .terminateLater
+        }
         terminating = true
         Task {
             var confirmed: [(WorkspaceProjectController, UInt64)] = []
@@ -192,6 +273,10 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     }
 
     private func launchInstance(arguments: [String] = []) {
+        if updates?.ownsUpdate == true || updates?.isChecking == true {
+            Task { await showError(UpdateSessionError.installing, title: L10n.text(.updatesTitle)) }
+            return
+        }
         Task {
             do { try await InstanceLauncher.launch(arguments: instanceArguments + arguments) }
             catch {
@@ -207,7 +292,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     }
 
     func perform(_ command: AppCommand) {
-        guard !terminating else { return }
+        guard !terminating, !starting else { return }
         if let selector = textSelector(for: command), let editor = NSApp.keyWindow?.firstResponder as? NSTextView, editor.isEditable {
             _ = NSApp.sendAction(NSSelectorFromString(selector), to: editor, from: nil)
             return
@@ -349,6 +434,8 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         }
         let app = menu("Moooyooo Mac Explore")
         app.addItem(withTitle: L10n.text(.about), action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        updates?.addMenu(to: app)
+        app.addItem(.separator())
         let languageItem = NSMenuItem(title: L10n.text(.languageMenu), action: nil, keyEquivalent: "")
         let languageMenu = NSMenu(title: languageItem.title)
         for (language, key): (AppLanguage, L10n.Key) in [(.system, .languageSystem), (.en, .languageEnglish), (.ja, .languageJapanese)] {
@@ -643,6 +730,16 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
         windows.compactMap { controller in
             guard let project = controller.project else { return nil }
             return RecoveryWorkspace(document: project.snapshot(), sourceURL: project.url, browserStates: controller.browserSessions)
+        }
+    }
+
+    private func updateSnapshot() -> [UpdateWorkspace] {
+        windows.compactMap { controller in
+            guard let project = controller.project else { return nil }
+            return UpdateWorkspace(
+                workspace: RecoveryWorkspace(document: project.snapshot(), sourceURL: project.url,
+                                             browserStates: controller.browserSessions),
+                savedDigest: project.opened?.contentDigest, isDirty: project.isDirty)
         }
     }
 

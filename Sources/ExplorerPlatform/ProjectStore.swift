@@ -36,7 +36,7 @@ final class AdvisoryLease: @unchecked Sendable {
         descriptor = -1
     }
 
-    static func acquire(key: String, directory: URL) throws -> AdvisoryLease? {
+    static func acquire(key: String, directory: URL, shared: Bool = false) throws -> AdvisoryLease? {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
                                                 attributes: [.posixPermissions: 0o700])
         let digest = SHA256.hash(data: Data(key.utf8)).map { String(format: "%02x", $0) }.joined()
@@ -47,7 +47,7 @@ final class AdvisoryLease: @unchecked Sendable {
         guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG, info.st_uid == getuid() else {
             Darwin.close(descriptor); throw StorageError.invalidFile
         }
-        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
+        guard flock(descriptor, (shared ? LOCK_SH : LOCK_EX) | LOCK_NB) == 0 else {
             let code = errno; Darwin.close(descriptor)
             if code == EWOULDBLOCK { return nil }
             throw NSError(domain: NSPOSIXErrorDomain, code: Int(code))
@@ -156,6 +156,7 @@ public struct OpenProject: Sendable {
     public let handleID: UUID
     public let url: URL
     public let document: ProjectDocument
+    public let contentDigest: String
     public let isWritable: Bool
     public let readOnlyReason: String?
 }
@@ -188,7 +189,8 @@ public actor ProjectStore {
         let document = try Self.resolveFolders(in: ProjectDocument.decode(data))
         let id = UUID()
         projects[id] = HeldProject(url: url, baseline: data, lease: lease)
-        return OpenProject(handleID: id, url: url, document: document, isWritable: lease != nil, readOnlyReason: reason)
+        return OpenProject(handleID: id, url: url, document: document, contentDigest: Self.digest(data),
+                           isWritable: lease != nil, readOnlyReason: reason)
     }
 
     public func close(_ id: UUID) { projects.removeValue(forKey: id)?.lease?.release() }
@@ -202,7 +204,8 @@ public actor ProjectStore {
         try StorageIO.atomicWrite(data, to: held.url, expected: held.baseline)
         held.baseline = data
         projects[handleID] = held
-        return OpenProject(handleID: handleID, url: held.url, document: next, isWritable: true, readOnlyReason: nil)
+        return OpenProject(handleID: handleID, url: held.url, document: next, contentDigest: Self.digest(data),
+                           isWritable: true, readOnlyReason: nil)
     }
 
     public func saveAs(_ document: ProjectDocument, to input: URL, replacing: Bool = false) throws -> OpenProject {
@@ -219,7 +222,8 @@ public actor ProjectStore {
             try StorageIO.atomicWrite(data, to: url, expected: previous)
             let id = UUID()
             projects[id] = HeldProject(url: url, baseline: data, lease: lease)
-            return OpenProject(handleID: id, url: url, document: next, isWritable: true, readOnlyReason: nil)
+            return OpenProject(handleID: id, url: url, document: next, contentDigest: Self.digest(data),
+                               isWritable: true, readOnlyReason: nil)
         }
     }
 
@@ -239,8 +243,13 @@ public actor ProjectStore {
             let document = try Self.resolveFolders(in: ProjectDocument.decode(data))
             held.baseline = data; held.lease = lease
             projects[id] = held
-            return OpenProject(handleID: id, url: held.url, document: document, isWritable: true, readOnlyReason: nil)
+            return OpenProject(handleID: id, url: held.url, document: document, contentDigest: Self.digest(data),
+                               isWritable: true, readOnlyReason: nil)
         }
+    }
+
+    private static func digest(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     static func bookmarkFolders(in input: ProjectDocument) throws -> ProjectDocument {

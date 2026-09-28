@@ -1,6 +1,18 @@
 // Keys shared by app, core validation, and platform errors.
 extension L10n {
     public enum Key: String, CaseIterable, Sendable {
+        case updatesTitle
+        case checkForUpdates
+        case automaticUpdateChecks
+        case installUpdatesOnQuit
+        case installUpdateNow
+        case updatesDetail
+        case updatesIsolated
+        case updateOtherInstance
+        case updateInstalling
+        case updateInvalidBuild
+        case updateBusy
+        case updateSaveFailed
         case untitled
         case fieldName
         case fieldOrder

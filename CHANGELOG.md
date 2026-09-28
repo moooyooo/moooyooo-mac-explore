@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.0 — development preview (2026-09-28)
+
+- Add Sparkle 2.10.0 and English/Japanese menus for manual and opt-in automatic updates.
+- Require signed feeds and archives from moooyooo's release repository; keep the
+  private Ed25519 key in Keychain and publish only the public key and signed feed.
+- Coordinate update ownership across processes, defer busy operations, preserve
+  workspaces on restart and protect the interval between app exit and replacement.
+- Add recovery after a newer build or full OS reboot following an interrupted update.
+- Sign nested framework/helpers and prepare appcasts only from reviewed,
+  Developer ID signed and notarized release archives.
+- Test real signed replacement/relaunch and reject tampered feeds and archives
+  with disposable hosts and keys; never update a running user app during tests.
+- The public feed is empty. Apple Developer enrollment and signed/notarized
+  distribution remain pending; older previews need one manual installation.
+
 ## 0.6.0 — development preview (source published 2026-09-27)
 
 - Add View-menu sorting, column order/width editing and reset, navigation visibility

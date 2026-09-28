@@ -1,7 +1,7 @@
 # Release preparation
 
-**0.6.0 is a development preview.** Browsing, projects, session recovery and basic
-file operations are available. Local performance targets pass; manual, external-storage
+**0.7.0 is a development preview.** Browsing, projects, session recovery, basic
+file operations and signed updates are available. Local performance targets pass; manual, external-storage
 and supported-OS qualification remain incomplete.
 
 ## Source publication checklist
@@ -33,6 +33,7 @@ python3 -m unittest discover -s Tests/ScriptTests
 scripts/build-app.sh release
 scripts/test.sh --integration
 scripts/test-volumes.sh
+python3 scripts/test-updates.py
 python3 scripts/verify-app.py
 git diff --check
 ```
@@ -65,7 +66,7 @@ host architecture; do not label them universal.
 scripts/package-release.sh --development
 ```
 
-Ignored `dist/` contains `Moooyooo-Mac-Explore-0.6.0-arm64-dev.zip` (host architecture),
+Ignored `dist/` contains `Moooyooo-Mac-Explore-0.7.0-arm64-dev.zip` (host architecture),
 a `.sha256` checksum and `.build.txt` with version, commit, dirty/clean state and toolchain.
 The script rebuilds, stages, archives, extracts and verifies the extracted app.
 Existing artifacts are never overwritten; move old artifacts before repeating it.
@@ -74,7 +75,7 @@ Ad-hoc signing is for development and is not Developer ID signing or notarizatio
 Check an archive from its directory:
 
 ```sh
-shasum -a 256 -c Moooyooo-Mac-Explore-0.6.0-arm64-dev.sha256
+shasum -a 256 -c Moooyooo-Mac-Explore-0.7.0-arm64-dev.sha256
 ```
 
 ## Retrieve CI artifacts
@@ -94,8 +95,9 @@ See [GitHub's artifact download instructions](https://docs.github.com/en/actions
 
 ## Developer ID and notarization
 
-**Not executed: this Mac currently has no valid signing identity.** The notarization
-branch is prepared and syntax-checked; it needs real credentials and end-to-end verification.
+**Not executed: the maintainer confirmed on 2026-09-28 that Apple Developer Program
+enrollment is pending.** This Mac has no valid signing identity. The notarization
+branch needs real credentials and end-to-end verification.
 
 1. Install the maintainer's Developer ID Application certificate in Keychain.
 2. Store credentials interactively with `xcrun notarytool store-credentials`.
@@ -112,8 +114,10 @@ scripts/package-release.sh --notarize
 This uploads a signed archive to Apple. The script enables Hardened Runtime and a
 secure timestamp, waits for Accepted, staples/validates the ticket, checks Gatekeeper,
 then repackages the stapled app. It operates on a staged copy of the local app.
-No signing secrets go to pull-request CI. No nested executable/framework is bundled,
-so signing does not use `--deep`.
+No signing secrets go to pull-request CI. `scripts/sign-app.sh` signs Sparkle's
+XPC services, Autoupdate tool, Updater.app and framework before the outer app.
+It preserves the downloader's entitlements, uses Hardened Runtime/timestamps for
+Developer ID, and uses `--deep` only for verification.
 
 Reports stay in ignored `.local/notarization/`. For a rejection or timeout, use
 `notarytool info/log` with the submission ID and the same profile. Resolve the failure
@@ -124,16 +128,25 @@ and [custom workflow](https://developer.apple.com/documentation/security/customi
 ## Version and release notes
 
 Update `CFBundleShortVersionString`/`CFBundleVersion` in `Resources/Info.plist`,
-the changelog and README together. Project schema version 1 is unchanged in 0.6.0.
+the changelog and README together. Project schema version 1 is unchanged in 0.7.0.
 UI language does not alter saved names, serialized keys or bookmark bytes.
-The [0.6.0 release notes draft](releases/0.6.0.md) lists features, known limitations
+The [0.7.0 release notes draft](releases/0.7.0.md) lists features, known limitations
 and local build instructions; add the actual publication/CI/artifact information
 when it exists.
 
-Verify the exact clean commit before tagging `v0.6.0` (or a named prerelease).
+Verify the exact clean commit before tagging `v0.7.0` (or a named prerelease).
 Release notes must include tested platforms, incomplete features, known issues,
 installation steps and checksums. Signing timestamps prevent byte-for-byte
 reproducibility; retain the commit/toolchain record instead of promising identical hashes.
+
+## Automatic update publication
+
+See [updates](updates.md) for moooyooo's Keychain account, first manual installation,
+the signed feed, and `scripts/prepare-update.py`. The latter accepts only a
+notarized archive from a clean checkout and prepares local upload artifacts.
+Publish and anonymously verify the GitHub Release ZIP before committing the signed
+appcast to `main`. Do not edit signed XML afterward. The current feed contains no releases.
+Only the public key is tracked; private keys must not enter source or CI.
 
 ## First-download acceptance
 
@@ -144,7 +157,9 @@ Download the notarized artifact in a browser on a fresh Mac:
 - Verify both languages, open/save dialogs and language selection.
 - Exercise multiple MDI windows/processes and save/switch a synthetic project.
 - Confirm save ownership, cancellation and recovery.
-- Quit, replace the app with the next version and reopen a version-1 project.
+- Test both manual replacement and an in-app signed update to the next build.
+  Exercise busy operations, other processes, cancellation, workspace restoration,
+  installation permission failure and interrupted downloads.
 - Removing the app must leave user files/projects intact. Preferences and recovery
   are stored separately under the app bundle identifier; delete them only deliberately.
 

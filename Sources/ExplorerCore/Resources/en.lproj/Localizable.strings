@@ -234,3 +234,15 @@
 "shortcutMac" = "Mac (Command)";
 "shortcutAlternative" = "Also available: %@";
 "shortcutsBodyMac" = "New Explorer: Cmd+N\nNew MDI window: Cmd+Option+N\nClose Explorer / window: Cmd+W / Cmd+Shift+W\nNext / previous Explorer: Control+Tab / Control+Shift+Tab\nEnter path / filter: Cmd+L / Cmd+F\nBack / forward: Cmd+[ / Cmd+]\nParent folder: Cmd+↑\nRefresh: Cmd+R / F5\nNew folder: Cmd+Shift+N\nRename: F2\nCopy / cut / paste: Cmd+C / Cmd+X / Cmd+V\nUndo: Cmd+Z\nMove to Trash: Cmd+Backspace\nOpen / save project: Cmd+O / Cmd+S\nSave project as: Cmd+Shift+S\nContext menu: Shift+F10\nMove / resize Explorer: Window menu\n\nControl text-editing and system bindings remain available. VoiceOver modifier keys are passed to VoiceOver.";
+"updatesTitle" = "Software Updates";
+"checkForUpdates" = "Check for Updates…";
+"automaticUpdateChecks" = "Automatically Check for Updates";
+"installUpdatesOnQuit" = "Download and Install Updates on Quit";
+"installUpdateNow" = "Install Downloaded Update and Restart";
+"updatesDetail" = "Check daily while this app is running. Updates are signed by moooyooo. Open workspaces are saved privately and restored after updating; project files are not overwritten.";
+"updatesIsolated" = "Updates are disabled for instances using an isolated support directory.";
+"updateOtherInstance" = "Close the other processes running this copy of the app, then check for updates again. Their windows and file operations will stay open until you close them.";
+"updateInstalling" = "This copy of the app is updating. Wait for the update to finish before launching another process. If the update was interrupted after the app exited, restart your Mac or manually install the intended newer version to resume your saved workspaces.";
+"updateInvalidBuild" = "This update does not match the supported build or release location.";
+"updateBusy" = "Finish or cancel the current file operation, project dialog, or update check, then try again. A downloaded update can be installed using the app menu or when you quit.";
+"updateSaveFailed" = "The workspace could not be saved for the update. The app will remain open.";

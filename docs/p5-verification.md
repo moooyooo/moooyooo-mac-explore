@@ -3,6 +3,8 @@
 Updated 2026-09-27. Versions 0.5.0/0.6.0 are development previews. P5 remains in progress
 because manual input, accessibility, display and supported-OS checks are outstanding.
 The measurements below are the 0.5.0 baseline. The final section records 0.6.0.
+The [0.7.0 update verification](update-verification.md) records the repeated
+performance measurements after bundling Sparkle.
 
 ## Functional additions
 

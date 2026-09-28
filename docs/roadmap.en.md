@@ -1,6 +1,6 @@
 # Roadmap
 
-Updated 2026-09-27. The [Japanese roadmap](roadmap.md) includes detailed acceptance criteria.
+Updated 2026-09-28. The [Japanese roadmap](roadmap.md) includes detailed acceptance criteria.
 The [current backlog](backlog.md) separates implementation work, known issues and maintainer actions.
 
 | Phase | Scope | Current state |
@@ -13,6 +13,7 @@ The [current backlog](backlog.md) separates implementation work, known issues an
 | P5 | Performance, accessibility and OS qualification | Local performance budgets and 50 pane cycles pass; IME, VoiceOver, display environments and minimum OS remain |
 | L10n | English/Japanese and language selection | Implemented; both workspace images reviewed; native panel/input checks remain |
 | P6 | Public documentation, CI and release preparation | Source public, private security reporting enabled and macOS 14/26 CI passed; signed distribution and manual acceptance remain |
+| Updates | Signed feeds/archives, process coordination and workspace handoff | Implemented in 0.7.0 with real disposable-host update and tamper tests; Developer ID/notarized distribution remains pending |
 
 By request, multilingual support and P6 preparation precede P4/P5. General-release
 criteria still include P4/P5. A browsing development preview may be published earlier
@@ -29,6 +30,8 @@ Hosted macOS 14/26 CI passed builds, integration and APFS-volume tests, and arch
 Remaining: manual minimum-OS, IME, display and VoiceOver checks; external-storage qualification;
 replacement for the retiring macOS 14 runner;
 Developer ID signing, notarization and first-download verification.
+The maintainer is not yet enrolled in Apple Developer Program and requested
+development validation first. The signed public update feed remains empty.
 
 See [P5 verification](p5-verification.md), [P6 verification](p6-verification.md),
 [release steps](releasing.md) and [localization](localization.md).

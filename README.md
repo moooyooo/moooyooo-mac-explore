@@ -8,7 +8,7 @@ A lightweight native macOS file manager with Windows Explorer-inspired controls.
 Arrange multiple Explorer panes inside an MDI window, keep several workspaces open,
 launch independent app processes, and save each workspace as a project.
 
-**0.6.0 development preview.** Browsing, projects, session recovery and basic file operations are implemented.
+**0.7.0 development preview.** Browsing, projects, session recovery, basic file operations and signed update support are implemented.
 File operations have synthetic-data, native AppKit and separate APFS volume tests;
 manual/Finder and physical removable/network-drive qualification remain open.
 See [file operations and limits](docs/file-operations.md).
@@ -23,7 +23,7 @@ Actual AppKit window content with synthetic files, captured in English and Japan
 
 ## Features
 
-- Native Swift + AppKit UI, with no external runtime dependencies.
+- Native Swift + AppKit UI; Sparkle 2 handles signed in-app updates.
 - Multiple MDI windows and movable/resizable Explorer panes; tile, cascade,
   maximize and minimize panes.
 - Independent app processes, including opening a saved project in another process.
@@ -101,6 +101,16 @@ open -n "build/Moooyooo Mac Explore.app" --args --language en --folder "$PWD"
 
 See [localization](docs/localization.md) for override precedence and translation work.
 
+### Updates
+
+Use **Moooyooo Mac Explore → Check for Updates**. Automatic daily checks and
+automatic download/install on quit are separate opt-in menu settings.
+Only moooyooo-signed feeds and archives are accepted. File operations and other
+processes defer updates; open workspaces are restored after installation.
+The signed public feed is currently empty: no notarized binary has been released.
+Install the first updater-enabled release manually; older previews cannot update themselves.
+See [update behavior, recovery and publishing](docs/updates.md).
+
 ### Keyboard controls
 
 Choose **Moooyooo Mac Explore → Keyboard Controls → Explorer / Mac**.
@@ -169,7 +179,7 @@ scripts/test-volumes.sh
 60-second idle CPU and 50 pane open/close cycles. Reports are kept under ignored
 `.local/`. `test-volumes.sh` creates its own 128 MiB APFS image to test cross-volume
 operations and real disk-full failures, then detaches it.
-`StorageProbe` and `BrowserBenchmark` are not bundled in the app.
+`StorageProbe`, `UpdateProbe` and `BrowserBenchmark` are not bundled in the app.
 `--support-directory` isolates test recovery, locks and recent-project records;
 processes editing the same project must use the same support directory.
 
@@ -177,7 +187,7 @@ processes editing the same project must use the same support directory.
 
 - [Contributing](CONTRIBUTING.md), [security reporting](SECURITY.md)
 - [Release preparation and packaging](docs/releasing.md)
-- [0.6.0 development release notes](docs/releases/0.6.0.md)
+- [0.7.0 development release notes](docs/releases/0.7.0.md)
 - [Current TODOs, issues and maintainer actions](docs/backlog.md)
 - [Requirements](docs/requirements.md), [UX](docs/ux.md), [architecture](docs/architecture.md),
   [project format](docs/projects.md) (detailed design documents currently in Japanese)

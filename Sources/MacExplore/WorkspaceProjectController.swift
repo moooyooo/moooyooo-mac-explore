@@ -55,6 +55,24 @@ final class WorkspaceProjectController {
         opened = nil; changed()
     }
 
+    func resumeAfterUpdate(_ saved: UpdateWorkspace) async throws {
+        try saved.validate()
+        if let url = saved.workspace.sourceURL, let digest = saved.savedDigest,
+           let project = try? await store.open(url) {
+            if project.contentDigest == digest {
+                try adopt(project)
+                try workspace?.restore(saved.workspace.document)
+                isDirty = saved.isDirty
+                generation &+= 1
+                updateTitle(); onChange?()
+                return
+            }
+            await store.close(project.handleID)
+        }
+        // No overwrite or stale editing lease when a source changed during restart.
+        try recover(saved.workspace.document)
+    }
+
     @discardableResult
     func save(asCopy: Bool = false) async -> Bool {
         guard !isBusy, let window = workspace?.window else { return false }

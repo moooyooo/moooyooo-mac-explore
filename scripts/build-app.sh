@@ -12,11 +12,13 @@ esac
 swift build --configuration "$configuration" --product MacExplore
 binary_dir="$(swift build --configuration "$configuration" --show-bin-path)"
 app_dir="${MACEXPLORE_APP_OUTPUT:-$project_dir/build/Moooyooo Mac Explore.app}"
-mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
+mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources/Licenses" "$app_dir/Contents/Frameworks"
 cp "$binary_dir/MacExplore" "$app_dir/Contents/MacOS/MacExplore.new"
 mv -f "$app_dir/Contents/MacOS/MacExplore.new" "$app_dir/Contents/MacOS/MacExplore"
 cp Resources/Info.plist "$app_dir/Contents/Info.plist"
 cp LICENSE THIRD_PARTY_NOTICES.md "$app_dir/Contents/Resources/"
+cp Licenses/Sparkle.txt "$app_dir/Contents/Resources/Licenses/"
+ditto "$binary_dir/Sparkle.framework" "$app_dir/Contents/Frameworks/Sparkle.framework"
 ditto "$binary_dir/MacExplore_ExplorerCore.bundle" "$app_dir/Contents/Resources/MacExplore_ExplorerCore.bundle"
 for language in en ja; do
     mkdir -p "$app_dir/Contents/Resources/$language.lproj"
@@ -24,6 +26,5 @@ for language in en ja; do
 done
 plutil -lint "$app_dir/Contents/Info.plist"
 # Local ad-hoc signing only. Developer ID signing/notarization belongs to the release workflow.
-codesign --force --sign - "$app_dir"
-codesign --verify --strict "$app_dir"
+scripts/sign-app.sh "$app_dir"
 printf '%s\n' "$app_dir"

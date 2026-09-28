@@ -7,6 +7,15 @@ import ExplorerPlatform
     static func main() async throws {
         let args = CommandLine.arguments
         guard args.count == 5 else { return }
+        if args[1] == "hold-update" {
+            let gate = UpdateSessionStore(bundleURL: URL(fileURLWithPath: args[3]),
+                                          supportDirectory: URL(fileURLWithPath: args[2]))
+            _ = try await gate.register(build: "7")
+            try Data("ready".utf8).write(to: URL(fileURLWithPath: args[4]), options: .atomic)
+            try await Task.sleep(for: .seconds(180))
+            await gate.close()
+            return
+        }
         if args[1] == "paste-cut" {
             let input = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: URL(fileURLWithPath: args[3])))
             let support = URL(fileURLWithPath: args[2])

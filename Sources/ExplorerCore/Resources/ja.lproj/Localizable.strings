@@ -234,3 +234,15 @@
 "shortcutMac" = "Mac（Command）";
 "shortcutAlternative" = "%@ でも操作できます";
 "shortcutsBodyMac" = "Explorer追加: Cmd+N\n親ウィンドウ追加: Cmd+Option+N\n子／親を閉じる: Cmd+W / Cmd+Shift+W\n次／前の子: Control+Tab / Control+Shift+Tab\nパス入力／名前検索: Cmd+L / Cmd+F\n戻る／進む: Cmd+[ / Cmd+]\n上の階層: Cmd+↑\n更新: Cmd+R / F5\n新しいフォルダ: Cmd+Shift+N\n名前の変更: F2\nコピー／切り取り／貼り付け: Cmd+C / Cmd+X / Cmd+V\n元に戻す: Cmd+Z\nゴミ箱へ移動: Cmd+⌫\nプロジェクトを開く／保存: Cmd+O / Cmd+S\n別名保存: Cmd+Shift+S\nコンテキストメニュー: Shift+F10\n子の移動・サイズ変更: ウィンドウメニュー\n\nControl系の文字編集・OS操作が使えます。VoiceOverの修飾キーはVoiceOverへ渡します。";
+"updatesTitle" = "ソフトウェアアップデート";
+"checkForUpdates" = "アップデートを確認…";
+"automaticUpdateChecks" = "アップデートを自動確認";
+"installUpdatesOnQuit" = "更新を自動ダウンロードして終了時にインストール";
+"installUpdateNow" = "ダウンロード済みの更新をインストールして再起動";
+"updatesDetail" = "起動中に1日1回確認します。moooyoooの署名付き更新を使用します。開いている画面はローカルに保存して更新後に復元し、プロジェクトファイルは上書きしません。";
+"updatesIsolated" = "独立したテスト用保存先で起動した場合、アップデートは無効です。";
+"updateOtherInstance" = "このアプリの別プロセスを終了してから、もう一度アップデートを確認してください。他の画面やファイル操作を自動で終了することはありません。";
+"updateInstalling" = "このアプリは更新中です。更新が完了してから別プロセスを起動してください。アプリの終了後に更新が中断した場合は、Macを再起動するか、更新先の新しいバージョンを手動でインストールすると、保存した画面を復元できます。";
+"updateInvalidBuild" = "更新のビルド番号または配布先が対応する形式ではありません。";
+"updateBusy" = "進行中のファイル操作、プロジェクトのダイアログ、更新の確認を完了またはキャンセルしてから再試行してください。ダウンロード済みの更新はアプリメニューまたは終了時にインストールできます。";
+"updateSaveFailed" = "更新前の画面構成を保存できませんでした。アプリを開いたままにします。";
