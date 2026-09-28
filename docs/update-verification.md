@@ -28,6 +28,13 @@
 [診断追加後のCI](https://github.com/moooyooo/moooyooo-mac-explore/actions/runs/36366628433)で、
 macOS 14・26ともビルド、統合試験、別APFSボリューム、実更新、開発版アーカイブ検証が成功。
 使い捨てアプリによる署名付き更新・改ざん拒否も両OSで実行した。
+[公開mainの最終CI](https://github.com/moooyooo/moooyooo-mac-explore/actions/runs/36366868886)
+（`688ceb3`）でも同じ全工程が成功し、診断追加後に2回連続で両OSを通過した。
+
+| 環境 | 統合試験（97定義／91実行） | APFS 3件 | 更新3シナリオ／Python 6件／ZIP検証 |
+| --- | --- | --- | --- |
+| macOS 14.8.9 / Swift 6.0.3 | 成功、9.924秒 | 成功、1.474秒 | 成功 |
+| macOS 26.6.2 / Swift 6.3.3 | 成功、9.952秒 | 成功、0.495秒 | 成功 |
 
 [最初の実行](https://github.com/moooyooo/moooyooo-mac-explore/actions/runs/36365828284)では
 macOS 14は成功し、macOS 26で2番目の読み取り専用プロセスの通常終了待ちが1回失敗した。
@@ -55,6 +62,7 @@ macOS 14は成功し、macOS 26で2番目の読み取り専用プロセスの通
 
 `scripts/benchmark-ui.sh`のRelease試験3件が成功。
 前回と同じ合成データと測定方式を使い、各試験の生データは以下へ記録した。
+測定対象は更新実装のコミット`d571cb7`。後続の終了診断追加後の性能再測定は行っていない。
 `--support-directory`で隔離しネットワーク更新を無効化した状態の測定であり、
 更新中のダウンロード／展開やSparkleダイアログの負荷を示す値ではない。
 
@@ -84,6 +92,22 @@ GitHub/AWS/Slackトークン形式の検出0件、ローカルMarkdownリンク�
 既存履歴の監査は[P6の記録](p6-verification.md)を参照。
 配布用秘密鍵は書き出さず、キーチェーン内で署名した。
 Gitのauthor/committerと公開先はmoooyoooを継続する。
+公開後にGitHubの未解決secret-scanningアラート0件を確認した。
+公開URLから匿名で取得した空の`appcast.xml`も、アプリ内の公開鍵で署名検証に成功。
+
+### ローカル開発用アーカイブ
+
+コミット`688ceb3565860e797850efc9e138f39d2da93703`のクリーンなソースから
+`scripts/package-release.sh --development`で作成し、ZIPを展開したアプリの
+入れ子の署名、翻訳、Sparkle、更新設定、ライセンスを再検証した。
+一般配布用の署名・公証済みZIPではなく、このローカル成果物を更新フィードには登録していない。
+
+```text
+dist/Moooyooo-Mac-Explore-0.7.0-arm64-dev.zip
+SHA-256: 3ccb6681b7bd2b0bafa9801b4845404b3d508b673a8f64b9e392d272267ebbc5
+```
+
+ビルド記録とチェックサムを同じ`dist/`に保存した。CI成果物は各実行のArtifactsを参照する。
 
 ## 未実施
 
