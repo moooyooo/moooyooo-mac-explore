@@ -62,9 +62,9 @@ reload and acquire editing access after the existing owner closes it.
 - Python 3 for repository validation and synthetic fixtures.
 
 Local verification uses macOS 26.5, Apple M2 Max and Swift 6.3.2 with Command Line
-Tools. For 0.7.1, hosted macOS 14 builds, automated tests and archive verification pass;
-the existing two-process termination issue I-06 recurred on macOS 26.
-See the [current release verification](docs/releases/0.7.1.md).
+Tools. For 0.7.2, hosted macOS 14/26 builds, automated tests and archive verification pass.
+The intermittent two-process termination issue I-06 remains under investigation.
+See the [current release verification](docs/releases/0.7.2.md).
 See the [workflow results](https://github.com/moooyooo/moooyooo-mac-explore/actions/workflows/ci.yml)
 and [publication verification](docs/p6-verification.md) for tested versions and scope.
 Builds contain the host architecture, not a universal binary.

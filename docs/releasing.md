@@ -25,8 +25,9 @@ Private vulnerability reporting, secret scanning and push protection are enabled
 Both matrix jobs passed in [the verified run](https://github.com/moooyooo/moooyooo-mac-explore/actions/runs/36286852444).
 The [P6 verification record](p6-verification.md) records versions, test counts and scope.
 For 0.7.1, macOS 14 passed but I-06 recurred in the macOS 26 two-process project test.
-The [0.7.1 release record](releases/0.7.1.md) includes that failed gate; resolve it
-before declaring this version qualified for general distribution.
+The [0.7.2 release record](releases/0.7.2.md) documents a successful follow-up on both OS versions.
+The cause of intermittent I-06 remains unresolved; continue its investigation
+before declaring the app qualified for general distribution.
 
 ## Local verification
 

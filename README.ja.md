@@ -158,8 +158,8 @@ Xcodeを選択している環境では通常のSwiftPM設定を利用します�
 
 初期確認環境はmacOS 26.5 / Apple Silicon / Swift 6.3.2 / Command Line Toolsです。
 現在選択されている開発者ディレクトリはCommand Line Toolsです。
-0.7.1はGitHub ActionsのmacOS 14で実アプリ・Releaseビルド・アーカイブ検証に成功しました。
-macOS 26では既知の終了試験の問題I-06が再発しています（[今回の検証結果](docs/releases/0.7.1.md)）。
+0.7.2はGitHub ActionsのmacOS 14/26で実アプリ・Releaseビルド・アーカイブ検証に成功しました。
+以前に発生した終了試験の問題I-06は原因未特定のため追跡を継続します（[今回の検証結果](docs/releases/0.7.2.md)）。
 実行状況は[GitHub Actions](https://github.com/moooyooo/moooyooo-mac-explore/actions/workflows/ci.yml)、
 公開時の確認結果は[P6の記録](docs/p6-verification.md)を参照してください。
 

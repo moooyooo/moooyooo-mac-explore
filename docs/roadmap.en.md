@@ -19,7 +19,7 @@ The [current backlog](backlog.md) separates implementation work, known issues an
 | P4 | Create, rename, copy, move, trash, drag-and-drop, Undo | Integrity, AppKit, separate APFS volume and real disk-full tests pass; Finder, physical/network volumes and disconnection remain |
 | P5 | Performance, accessibility and OS qualification | Local performance budgets and 50 pane cycles pass; IME, VoiceOver, display environments and minimum OS remain |
 | L10n | English/Japanese and language selection | Implemented; both workspace images reviewed; native panel/input checks remain |
-| P6 | Public documentation, CI and release preparation | Source public, private security reporting enabled; 0.7.1 passed macOS 14 CI, while I-06 recurred on macOS 26; signed distribution and manual acceptance remain |
+| P6 | Public documentation, CI and release preparation | Source public, private security reporting enabled; 0.7.2 passed macOS 14/26 CI; I-06 investigation, signed distribution and manual acceptance remain |
 | Updates | Signed feeds/archives, process coordination and workspace handoff | Implemented in 0.7.0 with real disposable-host update and tamper tests; Developer ID/notarized distribution remains pending |
 
 By request, multilingual support and P6 preparation precede P4/P5. General-release
@@ -32,9 +32,9 @@ MIT/public documentation and verified development packaging.
 Public upstream: [moooyooo/moooyooo-mac-explore](https://github.com/moooyooo/moooyooo-mac-explore),
 with private vulnerability reporting enabled.
 
-Previous hosted macOS 14/26 CI runs passed builds, integration and APFS-volume tests,
-and archive verification. For 0.7.1, macOS 14 passed; the unexpected dirty state and
-normal-termination failure in I-06 recurred on macOS 26. See the [current results](releases/0.7.1.md).
+Hosted macOS 14/26 CI for 0.7.2 passed builds, integration and APFS-volume tests,
+signed updates, native sidebar checks and archive verification. The intermittent
+I-06 from earlier runs remains under investigation. See the [current results](releases/0.7.2.md).
 
 Remaining: manual minimum-OS, IME, display and VoiceOver checks; external-storage qualification;
 replacement for the retiring macOS 14 runner;
