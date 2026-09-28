@@ -19,7 +19,8 @@ struct FolderNavigationTests {
     func workspaceLayoutSettlesAfterSelectingHome(width: Double) async throws {
         _ = NSApplication.shared
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let home = root.appendingPathComponent("Home")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent("Downloads"), withIntermediateDirectories: true)
         let workspace = WorkspaceWindowController(number: 1, directories: [root], newWindow: {}, newInstance: {})
         let window = try #require(workspace.window)
         window.setContentSize(NSSize(width: width, height: 600))
@@ -27,6 +28,7 @@ struct FolderNavigationTests {
         defer { workspace.stopLoading(); workspace.close(); try? FileManager.default.removeItem(at: root) }
         let browser = try #require(workspace.activeBrowser)
         let tree = try #require(browser.children.first as? FolderTreeController)
+        tree.configure(expanded: [], favorites: [], showHidden: false, homeDirectory: home)
         try await awaitCondition { !browser.loading }
         let parent = try #require(window.contentView as? LayoutView)
         let browserView = try #require(browser.view as? LayoutView)
@@ -36,7 +38,9 @@ struct FolderNavigationTests {
         browserView.onLayout = { browserCount += 1; browserLayout?() }
         #expect(window.makeFirstResponder(tree.outline))
         tree.outline.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
-        try await Task.sleep(for: .seconds(1))
+        // A runner's real home can be slow or change while other tests run.
+        // Start the idle check only after navigation to this isolated Home finishes.
+        try await awaitCondition { !browser.loading && browser.directory == home }
         parentCount = 0; browserCount = 0
         try await Task.sleep(for: .seconds(1))
         #expect(parentCount < 10)
@@ -84,7 +88,8 @@ struct FolderNavigationTests {
     @Test func selectingHomeDoesNotContinuouslyReload() async throws {
         _ = NSApplication.shared
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let home = root.appendingPathComponent("Home")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent("Downloads"), withIntermediateDirectories: true)
         let browser = ExplorerBrowserController(paneID: UUID(), directory: root)
         let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600),
                               styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
@@ -93,6 +98,7 @@ struct FolderNavigationTests {
         window.orderFront(nil)
         defer { browser.stop(); window.close(); try? FileManager.default.removeItem(at: root) }
         let tree = try #require(browser.children.first as? FolderTreeController)
+        tree.configure(expanded: [], favorites: [], showHidden: false, homeDirectory: home)
         try await awaitCondition { !browser.loading }
         let navigate = tree.onNavigate
         var navigationCount = 0
@@ -100,7 +106,7 @@ struct FolderNavigationTests {
         tree.onNavigate = { url in navigationCount += 1; navigate?(url) }
         browser.onLoadFinished = { finishedCount += 1 }
         tree.outline.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
-        try await awaitCondition { !browser.loading && navigationCount > 0 }
+        try await awaitCondition { !browser.loading && navigationCount == 1 && browser.directory == home }
         try await Task.sleep(for: .seconds(2))
         #expect(navigationCount == 1)
         #expect(finishedCount <= 2)
