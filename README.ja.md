@@ -158,7 +158,8 @@ Xcodeを選択している環境では通常のSwiftPM設定を利用します�
 
 初期確認環境はmacOS 26.5 / Apple Silicon / Swift 6.3.2 / Command Line Toolsです。
 現在選択されている開発者ディレクトリはCommand Line Toolsです。
-GitHub ActionsのmacOS 14/26で実アプリの自動検証・Releaseビルド・アーカイブ検証が成功しています。
+0.7.1はGitHub ActionsのmacOS 14で実アプリ・Releaseビルド・アーカイブ検証に成功しました。
+macOS 26では既知の終了試験の問題I-06が再発しています（[今回の検証結果](docs/releases/0.7.1.md)）。
 実行状況は[GitHub Actions](https://github.com/moooyooo/moooyooo-mac-explore/actions/workflows/ci.yml)、
 公開時の確認結果は[P6の記録](docs/p6-verification.md)を参照してください。
 
@@ -186,6 +187,6 @@ scripts/test-volumes.sh
 指定により、多言語対応を先に実装してP6の公開準備を進めています。
 日英・明暗の画面キャプチャと[0.7.1のリリースノート案](docs/releases/0.7.1.md)を用意しました。
 Publicリポジトリでソースを公開し、非公開の脆弱性報告窓口を有効にしました。
-macOS 14/26のCIが成功し、一般配布に向けたDeveloper ID署名・公証と実環境での手動確認が残っています。
+一般配布に向けてI-06の解消、Developer ID署名・公証と実環境での手動確認が残っています。
 作業の内訳とユーザー側で必要な対応は[TODO・ISSUE・ブロッカー](docs/backlog.md)にまとめています。
 検証条件は[配布手順](docs/releasing.md)と[P6の記録](docs/p6-verification.md)を参照してください。

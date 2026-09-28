@@ -24,6 +24,9 @@ with `main` as its default branch and `origin` as the local remote.
 Private vulnerability reporting, secret scanning and push protection are enabled.
 Both matrix jobs passed in [the verified run](https://github.com/moooyooo/moooyooo-mac-explore/actions/runs/36286852444).
 The [P6 verification record](p6-verification.md) records versions, test counts and scope.
+For 0.7.1, macOS 14 passed but I-06 recurred in the macOS 26 two-process project test.
+The [current release record](releases/0.7.1.md) includes that failed gate; resolve it
+before declaring this version qualified for general distribution.
 
 ## Local verification
 
@@ -34,6 +37,7 @@ scripts/build-app.sh release
 scripts/test.sh --integration
 scripts/test-volumes.sh
 python3 scripts/test-updates.py
+python3 scripts/test-sidebar.py
 python3 scripts/verify-app.py
 git diff --check
 ```
