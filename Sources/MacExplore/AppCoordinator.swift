@@ -220,6 +220,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        recordTerminationRequest()
         if starting { return .terminateNow }
         if fileOperations.isBusy {
             let operationWindow = windows.first(where: { $0.window?.attachedSheet != nil })?.window
@@ -595,6 +596,14 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
             "panes": windows.reduce(0) { $0 + $1.state.panes.count },
             "projects": windows.compactMap { $0.project?.opened }.count,
             "readOnlyProjects": windows.filter { $0.project?.isReadOnly == true }.count,
+            "dirtyProjects": windows.filter { $0.project?.isDirty == true }.count,
+            "busyProjects": windows.filter { $0.project?.isBusy == true }.count,
+            "attachedSheets": windows.filter { $0.window?.attachedSheet != nil }.count,
+            "openingProjects": opening.count,
+            "starting": starting,
+            "terminating": terminating,
+            "fileOperationBusy": fileOperations.isBusy,
+            "checkingForUpdates": updates?.isChecking == true,
             "physicalFootprintBytes": ProcessMetrics.physicalFootprint() ?? 0,
             "os": ProcessInfo.processInfo.operatingSystemVersionString,
             "language": L10n.current.language.rawValue,
@@ -610,6 +619,15 @@ final class AppCoordinator: NSObject, NSApplicationDelegate, NSMenuItemValidatio
             data["firstDirectoryReadySystemUptime"] = startTime + firstDirectoryTime
         }
         return data
+    }
+
+    private func recordTerminationRequest() {
+        guard let reportURL,
+              let data = try? JSONSerialization.data(withJSONObject: diagnostics(), options: [.prettyPrinted, .sortedKeys]) else { return }
+        let url = reportURL.appendingPathExtension("termination.json")
+        // Opt-in process-test diagnostics: counts and flags only, without user paths.
+        // A rejected quit must remain observable after the startup report is written.
+        Task.detached(priority: .utility) { try? data.write(to: url, options: .atomic) }
     }
 
     private func showDiagnostics() {

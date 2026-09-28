@@ -37,16 +37,23 @@ func realApplicationsRestoreProjectsAndShowSingleWriterOwnership() async throws 
     #expect(firstReport["panes"] as? Int == 2)
     #expect(firstReport["projects"] as? Int == 1)
     #expect(firstReport["readOnlyProjects"] as? Int == 0)
+    #expect(firstReport["dirtyProjects"] as? Int == 0)
     let second = try await launch("second.json")
     defer { if !second.isTerminated { second.forceTerminate() } }
     let secondReport = try await report("second.json")
     #expect(secondReport["readOnlyProjects"] as? Int == 1)
     #expect(secondReport["panes"] as? Int == 2)
+    #expect(secondReport["dirtyProjects"] as? Int == 0)
     #expect(first.processIdentifier != second.processIdentifier)
     #expect(first.terminate()); #expect(second.terminate())
     for _ in 0..<50 {
         if first.isTerminated && second.isTerminated { break }
         try await Task.sleep(for: .milliseconds(100))
+    }
+    for (app, name) in [(first, "first.json"), (second, "second.json")] where !app.isTerminated {
+        let url = fixture.root.appendingPathComponent(name).appendingPathExtension("termination.json")
+        let state = (try? String(contentsOf: url, encoding: .utf8)) ?? "No termination request report received."
+        print("App termination diagnostics (\(name)): \(state)")
     }
     #expect(first.isTerminated && second.isTerminated)
     // Healthy exit cleans up only each instance's own session and releases editing.
